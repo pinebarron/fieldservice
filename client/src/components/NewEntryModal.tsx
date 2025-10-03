@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertWorkLogSchema, type InsertWorkLog } from "@shared/schema";
+import { insertWorkLogSchema, type InsertWorkLog, type User, type BusinessMember } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAuth } from "@/hooks/useAuth";
 import { ObjectUploader } from "@/components/ObjectUploader";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -30,8 +31,14 @@ interface NewEntryModalProps {
 
 export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [uploadedPdfs, setUploadedPdfs] = useState<string[]>([]);
+
+  const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
+    queryKey: ["/api/business/members"],
+    enabled: isOpen,
+  });
 
   const form = useForm<InsertWorkLog>({
     resolver: zodResolver(insertWorkLogSchema),
@@ -42,7 +49,8 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
       city: "",
       state: "",
       zipCode: "",
-      technicianName: "Mike Johnson", // Default to current user
+      businessId: "",
+      technicianUserId: user?.id || "",
       serviceDate: new Date().toISOString().split('T')[0],
       startTime: null,
       endTime: null,
@@ -274,13 +282,24 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
-                  name="technicianName"
+                  name="technicianUserId"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Technician Name *</FormLabel>
-                      <FormControl>
-                        <Input {...field} placeholder="Enter technician name" data-testid="input-technician-name" />
-                      </FormControl>
+                      <FormLabel>Technician *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value || user?.id}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-technician">
+                            <SelectValue placeholder="Select technician" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {members.map((member) => (
+                            <SelectItem key={member.userId} value={member.userId}>
+                              {member.user.firstName} {member.user.lastName}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

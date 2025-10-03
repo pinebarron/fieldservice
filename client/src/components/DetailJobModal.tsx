@@ -100,7 +100,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
               </span>
               <span className="text-muted-foreground">
                 <i className="fas fa-user mr-1"></i>
-                {workLog.technicianName}
+                {(workLog as any).technician?.firstName} {(workLog as any).technician?.lastName}
               </span>
               <span className="status-badge px-3 py-1 bg-accent/10 text-accent rounded-full text-xs font-medium">
                 <i className="fas fa-check-circle mr-1"></i>

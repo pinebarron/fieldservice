@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import { WorkLogCard } from "@/components/WorkLogCard";
 import { NewEntryModal } from "@/components/NewEntryModal";
 import { DetailJobModal } from "@/components/DetailJobModal";
 import { ImageLightbox } from "@/components/ImageLightbox";
+import { useAuth } from "@/hooks/useAuth";
 import { type WorkLog } from "@shared/schema";
 
 interface Stats {
@@ -23,6 +25,7 @@ export default function Dashboard() {
   const [lightboxIndex, setLightboxIndex] = useState(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
+  const { user } = useAuth();
 
   const { data: workLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useQuery<WorkLog[]>({
     queryKey: ['/api/work-logs'],
@@ -82,14 +85,36 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <button className="text-muted-foreground hover:text-foreground transition-colors" data-testid="notifications-button">
-                <i className="fas fa-bell text-lg"></i>
-              </button>
-              <div className="flex items-center gap-2 cursor-pointer">
-                <div className="w-9 h-9 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                  MJ
-                </div>
-                <span className="hidden sm:block text-sm font-medium text-foreground">Mike Johnson</span>
+              <Link href="/employees">
+                <Button variant="ghost" size="sm" data-testid="employees-link">
+                  <i className="fas fa-users mr-2"></i>
+                  <span className="hidden sm:inline">Employees</span>
+                </Button>
+              </Link>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => window.location.href = "/api/logout"}
+                data-testid="logout-button"
+              >
+                <i className="fas fa-sign-out-alt mr-2"></i>
+                <span className="hidden sm:inline">Logout</span>
+              </Button>
+              <div className="flex items-center gap-2">
+                {user?.profileImageUrl ? (
+                  <img 
+                    src={user.profileImageUrl} 
+                    alt={`${user.firstName} ${user.lastName}`}
+                    className="w-9 h-9 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-9 h-9 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                    {user?.firstName?.[0]}{user?.lastName?.[0]}
+                  </div>
+                )}
+                <span className="hidden sm:block text-sm font-medium text-foreground">
+                  {user?.firstName} {user?.lastName}
+                </span>
               </div>
             </div>
           </div>

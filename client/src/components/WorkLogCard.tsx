@@ -63,7 +63,7 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
                 <div className="flex flex-wrap gap-3 mt-3 text-sm">
                   <span className="text-muted-foreground" data-testid={`work-log-technician-${workLog.id}`}>
                     <i className="fas fa-user mr-1"></i>
-                    {workLog.technicianName}
+                    {(workLog as any).technician?.firstName} {(workLog as any).technician?.lastName}
                   </span>
                   <span className="text-muted-foreground" data-testid={`work-log-date-${workLog.id}`}>
                     <i className="fas fa-calendar mr-1"></i>
