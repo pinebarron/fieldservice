@@ -14,6 +14,8 @@ import { Separator } from "@/components/ui/separator";
 export function EmployeeManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [employeeEmail, setEmployeeEmail] = useState("");
+  const [employeeFirstName, setEmployeeFirstName] = useState("");
+  const [employeeLastName, setEmployeeLastName] = useState("");
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -23,17 +25,18 @@ export function EmployeeManagement() {
   });
 
   const addMemberMutation = useMutation({
-    mutationFn: async (userId: string) => {
-      return await apiRequest("/api/business/members", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role: "technician" }),
+    mutationFn: async (data: { email: string; firstName: string; lastName: string }) => {
+      return await apiRequest("POST", "/api/business/members", { 
+        ...data, 
+        role: "technician" 
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business/members"] });
       setIsAddDialogOpen(false);
       setEmployeeEmail("");
+      setEmployeeFirstName("");
+      setEmployeeLastName("");
       toast({
         title: "Success",
         description: "Employee added successfully!",
@@ -50,9 +53,7 @@ export function EmployeeManagement() {
 
   const removeMemberMutation = useMutation({
     mutationFn: async (memberId: string) => {
-      return await apiRequest(`/api/business/members/${memberId}`, {
-        method: "DELETE",
-      });
+      return await apiRequest("DELETE", `/api/business/members/${memberId}`);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business/members"] });
@@ -72,9 +73,13 @@ export function EmployeeManagement() {
 
   const handleAddEmployee = (e: React.FormEvent) => {
     e.preventDefault();
-    // For now, we'll use the email as a placeholder for user ID
-    // In a real system, you'd look up the user by email first
-    addMemberMutation.mutate(employeeEmail);
+    if (employeeEmail && employeeFirstName && employeeLastName) {
+      addMemberMutation.mutate({
+        email: employeeEmail,
+        firstName: employeeFirstName,
+        lastName: employeeLastName,
+      });
+    }
   };
 
   return (
@@ -168,33 +173,56 @@ export function EmployeeManagement() {
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Employee</DialogTitle>
+            <DialogTitle>Add New Employee</DialogTitle>
             <DialogDescription>
-              Enter the user ID of the employee you want to add to your business
+              Enter the employee's information to add them to your team.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddEmployee} className="space-y-4">
             <div>
-              <Label htmlFor="employee-id">Employee User ID</Label>
+              <Label htmlFor="employee-email">Email Address</Label>
               <Input
-                id="employee-id"
-                data-testid="input-employee-id"
-                type="text"
-                placeholder="Enter user ID"
+                id="employee-email"
+                data-testid="input-employee-email"
+                type="email"
+                placeholder="employee@example.com"
                 value={employeeEmail}
                 onChange={(e) => setEmployeeEmail(e.target.value)}
                 required
                 className="mt-2"
               />
-              <p className="text-sm text-muted-foreground mt-2">
-                The employee must have already signed in to get their user ID
-              </p>
+            </div>
+            <div>
+              <Label htmlFor="employee-first-name">First Name</Label>
+              <Input
+                id="employee-first-name"
+                data-testid="input-employee-first-name"
+                type="text"
+                placeholder="John"
+                value={employeeFirstName}
+                onChange={(e) => setEmployeeFirstName(e.target.value)}
+                required
+                className="mt-2"
+              />
+            </div>
+            <div>
+              <Label htmlFor="employee-last-name">Last Name</Label>
+              <Input
+                id="employee-last-name"
+                data-testid="input-employee-last-name"
+                type="text"
+                placeholder="Doe"
+                value={employeeLastName}
+                onChange={(e) => setEmployeeLastName(e.target.value)}
+                required
+                className="mt-2"
+              />
             </div>
             <div className="flex gap-2">
               <Button 
                 type="submit"
-                disabled={addMemberMutation.isPending || !employeeEmail.trim()}
-                data-testid="button-submit-add-employee"
+                disabled={addMemberMutation.isPending || !employeeEmail.trim() || !employeeFirstName.trim() || !employeeLastName.trim()}
+                data-testid="button-submit-employee"
               >
                 {addMemberMutation.isPending ? "Adding..." : "Add Employee"}
               </Button>

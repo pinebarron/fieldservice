@@ -81,8 +81,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Business not found" });
       }
 
+      const { email, firstName, lastName, role = "technician" } = req.body;
+      
+      // Create or get user
+      let user = await storage.getUserByEmail(email);
+      if (!user) {
+        user = await storage.createUser({
+          id: crypto.randomUUID(),
+          email,
+          firstName,
+          lastName,
+          profileImageUrl: null,
+        });
+      }
+
       const validatedData = insertBusinessMemberSchema.parse({
-        ...req.body,
+        userId: user.id,
+        role,
         businessId: business.id,
       });
       const member = await storage.addBusinessMember(validatedData);

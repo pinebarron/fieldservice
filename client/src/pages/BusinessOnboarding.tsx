@@ -16,11 +16,7 @@ export function BusinessOnboarding() {
 
   const createBusinessMutation = useMutation({
     mutationFn: async (name: string) => {
-      return await apiRequest("/api/business", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-      });
+      return await apiRequest("POST", "/api/business", { name });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/business"] });
