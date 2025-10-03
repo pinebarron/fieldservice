@@ -20,6 +20,7 @@ interface Stats {
 
 export default function Dashboard() {
   const [isNewEntryModalOpen, setIsNewEntryModalOpen] = useState(false);
+  const [editWorkLog, setEditWorkLog] = useState<WorkLog | null>(null);
   const [selectedWorkLog, setSelectedWorkLog] = useState<WorkLog | null>(null);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
@@ -56,6 +57,17 @@ export default function Dashboard() {
 
   const handleWorkLogSelect = (workLog: WorkLog) => {
     setSelectedWorkLog(workLog);
+  };
+
+  const handleEditWorkLog = (workLog: WorkLog) => {
+    setEditWorkLog(workLog);
+    setIsNewEntryModalOpen(true);
+    setSelectedWorkLog(null);
+  };
+
+  const handleCloseNewEntryModal = () => {
+    setIsNewEntryModalOpen(false);
+    setEditWorkLog(null);
   };
 
   if (logsLoading || statsLoading) {
@@ -274,8 +286,9 @@ export default function Dashboard() {
       {/* Modals */}
       <NewEntryModal
         isOpen={isNewEntryModalOpen}
-        onClose={() => setIsNewEntryModalOpen(false)}
+        onClose={handleCloseNewEntryModal}
         onSuccess={refetchLogs}
+        editWorkLog={editWorkLog || undefined}
       />
 
       {selectedWorkLog && (
@@ -285,6 +298,7 @@ export default function Dashboard() {
           onClose={() => setSelectedWorkLog(null)}
           onOpenLightbox={handleOpenLightbox}
           onRefresh={refetchLogs}
+          onEdit={handleEditWorkLog}
         />
       )}
 

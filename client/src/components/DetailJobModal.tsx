@@ -12,9 +12,10 @@ interface DetailJobModalProps {
   onClose: () => void;
   onOpenLightbox: (images: string[], index: number) => void;
   onRefresh: () => void;
+  onEdit: (workLog: WorkLog) => void;
 }
 
-export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRefresh }: DetailJobModalProps) {
+export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRefresh, onEdit }: DetailJobModalProps) {
   const { toast } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -238,7 +239,11 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <Button className="flex-1" data-testid="button-edit-entry">
+            <Button 
+              className="flex-1" 
+              onClick={() => onEdit(workLog)}
+              data-testid="button-edit-entry"
+            >
               <i className="fas fa-edit mr-2"></i>
               Edit Entry
             </Button>

@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertWorkLogSchema, type InsertWorkLog, type User, type BusinessMember } from "@shared/schema";
+import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type User, type BusinessMember } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -27,13 +27,15 @@ interface NewEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  editWorkLog?: WorkLog;
 }
 
-export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps) {
+export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog }: NewEntryModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
-  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
-  const [uploadedPdfs, setUploadedPdfs] = useState<string[]>([]);
+  const isEditMode = !!editWorkLog;
+  const [uploadedImages, setUploadedImages] = useState<string[]>(editWorkLog?.imageUrls || []);
+  const [uploadedPdfs, setUploadedPdfs] = useState<string[]>(editWorkLog?.pdfUrls || []);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
@@ -62,15 +64,66 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
     },
   });
 
-  const createWorkLogMutation = useMutation({
+  useEffect(() => {
+    if (editWorkLog) {
+      form.reset({
+        customerName: editWorkLog.customerName,
+        workType: editWorkLog.workType,
+        locationName: editWorkLog.locationName,
+        city: editWorkLog.city,
+        state: editWorkLog.state,
+        zipCode: editWorkLog.zipCode,
+        businessId: editWorkLog.businessId,
+        technicianUserId: editWorkLog.technicianUserId,
+        serviceDate: editWorkLog.serviceDate,
+        startTime: editWorkLog.startTime || null,
+        endTime: editWorkLog.endTime || null,
+        workPerformed: editWorkLog.workPerformed,
+        additionalNotes: editWorkLog.additionalNotes || null,
+        status: editWorkLog.status,
+        imageUrls: editWorkLog.imageUrls || [],
+        pdfUrls: editWorkLog.pdfUrls || [],
+      });
+      setUploadedImages(editWorkLog.imageUrls || []);
+      setUploadedPdfs(editWorkLog.pdfUrls || []);
+    } else if (isOpen) {
+      form.reset({
+        customerName: "",
+        workType: "",
+        locationName: "",
+        city: "",
+        state: "",
+        zipCode: "",
+        businessId: "",
+        technicianUserId: user?.id || "",
+        serviceDate: new Date().toISOString().split('T')[0],
+        startTime: null,
+        endTime: null,
+        workPerformed: "",
+        additionalNotes: null,
+        status: "completed",
+        imageUrls: [],
+        pdfUrls: [],
+      });
+      setUploadedImages([]);
+      setUploadedPdfs([]);
+    }
+  }, [editWorkLog, isOpen, form, user]);
+
+  const saveWorkLogMutation = useMutation({
     mutationFn: async (data: InsertWorkLog) => {
-      const response = await apiRequest("POST", "/api/work-logs", data);
-      return response.json();
+      if (isEditMode && editWorkLog) {
+        const response = await apiRequest("PATCH", `/api/work-logs/${editWorkLog.id}`, data);
+        return response.json();
+      } else {
+        const response = await apiRequest("POST", "/api/work-logs", data);
+        return response.json();
+      }
     },
     onSuccess: () => {
       toast({
         title: "Success",
-        description: "Work log entry created successfully",
+        description: isEditMode ? "Work log updated successfully" : "Work log entry created successfully",
       });
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
@@ -80,7 +133,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
     onError: () => {
       toast({
         title: "Error",
-        description: "Failed to create work log entry",
+        description: isEditMode ? "Failed to update work log" : "Failed to create work log entry",
         variant: "destructive",
       });
     },
@@ -94,7 +147,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
   };
 
   const onSubmit = (data: InsertWorkLog) => {
-    createWorkLogMutation.mutate({
+    saveWorkLogMutation.mutate({
       ...data,
       imageUrls: uploadedImages,
       pdfUrls: uploadedPdfs,
@@ -158,7 +211,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Work Log Entry</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Work Log Entry" : "Create New Work Log Entry"}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -324,7 +377,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
                     <FormItem>
                       <FormLabel>Start Time</FormLabel>
                       <FormControl>
-                        <Input {...field} type="time" data-testid="input-start-time" />
+                        <Input {...field} value={field.value || ""} type="time" data-testid="input-start-time" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -337,7 +390,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
                     <FormItem>
                       <FormLabel>End Time</FormLabel>
                       <FormControl>
-                        <Input {...field} type="time" data-testid="input-end-time" />
+                        <Input {...field} value={field.value || ""} type="time" data-testid="input-end-time" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -471,6 +524,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
                     <FormControl>
                       <Textarea
                         {...field}
+                        value={field.value || ""}
                         rows={3}
                         placeholder="Any additional comments, follow-up required, or special observations..."
                         className="resize-none"
@@ -488,18 +542,18 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
               <Button 
                 type="submit" 
                 className="flex-1" 
-                disabled={createWorkLogMutation.isPending}
+                disabled={saveWorkLogMutation.isPending}
                 data-testid="button-save-entry"
               >
-                {createWorkLogMutation.isPending ? (
+                {saveWorkLogMutation.isPending ? (
                   <>
                     <i className="fas fa-spinner fa-spin mr-2"></i>
-                    Saving...
+                    {isEditMode ? "Updating..." : "Saving..."}
                   </>
                 ) : (
                   <>
                     <i className="fas fa-save mr-2"></i>
-                    Save Work Log Entry
+                    {isEditMode ? "Update Work Log" : "Save Work Log Entry"}
                   </>
                 )}
               </Button>

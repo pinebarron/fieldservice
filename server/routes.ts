@@ -207,6 +207,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(404).json({ error: "Work log not found" });
+      }
+
+      const validatedData = insertWorkLogSchema.parse({
+        ...req.body,
+        businessId: business.id,
+      });
+      const workLog = await storage.updateWorkLog(req.params.id, business.id, validatedData);
+      if (!workLog) {
+        return res.status(404).json({ error: "Work log not found" });
+      }
+      res.json(workLog);
+    } catch (error) {
+      console.error("Error updating work log:", error);
+      res.status(400).json({ error: "Invalid work log data" });
+    }
+  });
+
   app.delete("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
