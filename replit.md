@@ -1,12 +1,34 @@
-# Work Log Management System
+# FieldCapture - Work Log Management System
 
 ## Overview
 
-This is a full-stack work log management application built for tracking service jobs, particularly focused on solar installation and maintenance work. The application allows technicians to create, view, filter, and manage work log entries with support for image and PDF attachments. It uses a modern React frontend with a Node.js/Express backend, PostgreSQL database via Drizzle ORM, and integrates with Google Cloud Storage for file uploads.
+FieldCapture is a field service management web application designed for solar and industrial industries. It enables businesses to manage their service teams and track work performed at customer sites with comprehensive documentation including images and reports. The application features multi-user authentication via Replit Auth, business account management, employee/crew management, and work log creation with file uploads. Built with a modern React frontend, Express backend, PostgreSQL database via Drizzle ORM, and Replit Object Storage for file uploads.
 
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Recent Changes (October 2025)
+
+### Multi-Tenancy & Business Accounts
+- Implemented business account system where each business owner can sign up and create their business
+- Added employee management for businesses to add and manage crew members
+- Work logs are now scoped to businesses with technician selection from business members
+- Business owners automatically become members of their business when created
+
+### Authentication & User Management
+- Integrated Replit Auth for multi-provider authentication (Google, GitHub, X, Apple, email/password)
+- Session-based authentication with PostgreSQL session storage
+- User profiles with firstName, lastName, email, and profile images
+- Landing page with login flow and business onboarding for new users
+
+### Database Schema Updates
+- Migrated from in-memory storage to PostgreSQL with Drizzle ORM
+- Added `users` table for Replit Auth integration
+- Added `businesses` table for business accounts
+- Added `business_members` junction table for employee management
+- Updated `work_logs` table to use `businessId` and `technicianUserId` foreign keys
+- Work logs now join with users to display technician full names
 
 ## System Architecture
 
@@ -48,9 +70,13 @@ Preferred communication style: Simple, everyday language.
 
 **API Design**
 - RESTful API endpoints under `/api` prefix
-- CRUD operations for work logs (`/api/work-logs`)
-- Query parameter-based filtering for work logs
-- Statistics endpoint (`/api/stats`) for dashboard metrics
+- Authentication endpoints: `/api/login`, `/api/logout`, `/api/auth/user`
+- Business endpoints: `POST /api/business` (create), `GET /api/business` (get user's business)
+- Employee management: `POST /api/business/members` (add employee), `GET /api/business/members` (list), `DELETE /api/business/members/:id` (remove)
+- Work log endpoints: `POST /api/work-logs` (create), `GET /api/work-logs` (list with filters), `GET /api/work-logs/:id` (get), `PATCH /api/work-logs/:id` (update), `DELETE /api/work-logs/:id` (delete)
+- Statistics endpoint: `GET /api/stats` for dashboard metrics
+- All work log and business endpoints require authentication via `isAuthenticated` middleware
+- Business-scoped queries automatically filter by user's business
 
 **Development Setup**
 - Vite middleware integration in development mode for HMR
@@ -65,14 +91,20 @@ Preferred communication style: Simple, everyday language.
 - Schema-first approach with TypeScript types inferred from schema
 
 **Database Schema**
-- `users` table: Basic user authentication (id, username, password)
-- `work_logs` table: Core work log entries with fields for customer info, work details, technician, dates, status, and file URLs
-- JSON columns for storing arrays of image and PDF URLs
-- Automatic timestamps (createdAt, updatedAt) on work logs
+- `users` table: User accounts from Replit Auth (id, email, firstName, lastName, profileImageUrl, timestamps)
+- `sessions` table: Session storage for Replit Auth (required for authentication)
+- `businesses` table: Business accounts (id, name, ownerId, timestamps)
+- `business_members` table: Junction table linking users to businesses (id, businessId, userId, role, createdAt)
+- `work_logs` table: Work log entries (id, businessId, technicianUserId, customer info, location details, service details, status, image/PDF URLs, timestamps)
+- JSON columns in work_logs for storing arrays of image and PDF URLs
+- Foreign key relationships: businesses.ownerId → users.id, business_members.userId → users.id, work_logs.businessId → businesses.id, work_logs.technicianUserId → users.id
 
-**In-Memory Fallback**
-- `MemStorage` class implementing `IStorage` interface for development/testing
-- Provides same API as database storage for seamless switching
+**Authentication System**
+- Replit Auth integration via `openid-client` library
+- OIDC (OpenID Connect) flow for authentication
+- Session storage in PostgreSQL for persistent sessions
+- User data automatically synced from auth provider claims
+- Support for multiple OAuth providers (Google, GitHub, X, Apple) and email/password
 
 **Data Validation**
 - Zod schemas generated from Drizzle table definitions using `drizzle-zod`
