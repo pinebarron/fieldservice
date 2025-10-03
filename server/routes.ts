@@ -1,29 +1,131 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkLogSchema, updateWorkLogSchema } from "@shared/schema";
-import {
-  ObjectStorageService,
-  ObjectNotFoundError,
-} from "./objectStorage";
+import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema } from "@shared/schema";
+import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
+import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const objectStorageService = new ObjectStorageService();
 
-  // Work Log Routes
-  app.get("/api/work-logs", async (req, res) => {
+  // Setup authentication (from Replit Auth blueprint)
+  await setupAuth(app);
+
+  // Auth routes
+  app.get('/api/auth/user', isAuthenticated, async (req: any, res) => {
     try {
-      const { workType, customerName, technicianName, dateFrom, dateTo } = req.query;
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+      res.json(user);
+    } catch (error) {
+      console.error("Error fetching user:", error);
+      res.status(500).json({ message: "Failed to fetch user" });
+    }
+  });
+
+  // Business routes
+  app.post("/api/business", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      
+      // Check if user already has a business
+      const existingBusiness = await storage.getBusinessByOwnerId(userId);
+      if (existingBusiness) {
+        return res.status(400).json({ error: "User already has a business" });
+      }
+
+      const validatedData = insertBusinessSchema.parse({
+        ...req.body,
+        ownerId: userId,
+      });
+      const business = await storage.createBusiness(validatedData);
+      res.status(201).json(business);
+    } catch (error) {
+      console.error("Error creating business:", error);
+      res.status(400).json({ error: "Invalid business data" });
+    }
+  });
+
+  app.get("/api/business", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      res.json(business || null);
+    } catch (error) {
+      console.error("Error fetching business:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Business member routes
+  app.get("/api/business/members", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(404).json({ error: "Business not found" });
+      }
+      const members = await storage.getBusinessMembers(business.id);
+      res.json(members);
+    } catch (error) {
+      console.error("Error fetching business members:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/business/members", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(404).json({ error: "Business not found" });
+      }
+
+      const validatedData = insertBusinessMemberSchema.parse({
+        ...req.body,
+        businessId: business.id,
+      });
+      const member = await storage.addBusinessMember(validatedData);
+      res.status(201).json(member);
+    } catch (error) {
+      console.error("Error adding business member:", error);
+      res.status(400).json({ error: "Invalid member data" });
+    }
+  });
+
+  app.delete("/api/business/members/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const deleted = await storage.removeBusinessMember(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Member not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error removing business member:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Work Log Routes (all protected)
+  app.get("/api/work-logs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.json([]);
+      }
+
+      const { workType, customerName, technicianUserId, dateFrom, dateTo } = req.query;
       
       const filters = {
         workType: workType as string,
         customerName: customerName as string, 
-        technicianName: technicianName as string,
+        technicianUserId: technicianUserId as string,
         dateFrom: dateFrom as string,
         dateTo: dateTo as string,
       };
 
-      const workLogs = await storage.getWorkLogsByFilter(filters);
+      const workLogs = await storage.getWorkLogsByFilter(business.id, filters);
       res.json(workLogs);
     } catch (error) {
       console.error("Error fetching work logs:", error);
@@ -31,9 +133,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/work-logs/:id", async (req, res) => {
+  app.get("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const workLog = await storage.getWorkLog(req.params.id);
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(404).json({ error: "Work log not found" });
+      }
+
+      const workLog = await storage.getWorkLog(req.params.id, business.id);
       if (!workLog) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -44,9 +152,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/work-logs", async (req, res) => {
+  app.post("/api/work-logs", isAuthenticated, async (req: any, res) => {
     try {
-      const validatedData = insertWorkLogSchema.parse(req.body);
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(400).json({ error: "Business not found" });
+      }
+
+      const validatedData = insertWorkLogSchema.parse({
+        ...req.body,
+        businessId: business.id,
+      });
       const workLog = await storage.createWorkLog(validatedData);
       res.status(201).json(workLog);
     } catch (error) {
@@ -55,10 +172,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.put("/api/work-logs/:id", async (req, res) => {
+  app.put("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(404).json({ error: "Work log not found" });
+      }
+
       const validatedData = updateWorkLogSchema.parse(req.body);
-      const workLog = await storage.updateWorkLog(req.params.id, validatedData);
+      const workLog = await storage.updateWorkLog(req.params.id, business.id, validatedData);
       if (!workLog) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -69,9 +192,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/work-logs/:id", async (req, res) => {
+  app.delete("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
-      const deleted = await storage.deleteWorkLog(req.params.id);
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.status(404).json({ error: "Work log not found" });
+      }
+
+      const deleted = await storage.deleteWorkLog(req.params.id, business.id);
       if (!deleted) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -128,9 +257,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stats endpoint
-  app.get("/api/stats", async (req, res) => {
+  app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
-      const workLogs = await storage.getWorkLogs();
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) {
+        return res.json({
+          totalJobs: 0,
+          weekJobs: 0,
+          thisMonthJobs: 0,
+          images: 0,
+          reports: 0
+        });
+      }
+
+      const workLogs = await storage.getWorkLogs(business.id);
       const now = new Date();
       const thisWeekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
       const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
