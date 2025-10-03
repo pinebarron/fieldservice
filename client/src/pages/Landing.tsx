@@ -16,14 +16,19 @@ export function Landing() {
           <p className="text-xl text-muted-foreground mb-8">
             Professional work log management for solar and industrial field service teams
           </p>
-          <Button 
-            size="lg" 
-            onClick={handleLogin}
-            data-testid="login-button"
-            className="text-lg px-8 py-6"
-          >
-            Sign In to Get Started
-          </Button>
+          <p className="text-base text-muted-foreground mb-6">
+            New users will be prompted to create their business account after signing in
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button 
+              size="lg" 
+              onClick={handleLogin}
+              data-testid="login-button"
+              className="text-lg px-8 py-6"
+            >
+              Get Started - Sign Up or Sign In
+            </Button>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
