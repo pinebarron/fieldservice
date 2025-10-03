@@ -215,10 +215,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Work log not found" });
       }
 
-      const validatedData = insertWorkLogSchema.parse({
-        ...req.body,
-        businessId: business.id,
-      });
+      const validatedData = updateWorkLogSchema.parse(req.body);
       const workLog = await storage.updateWorkLog(req.params.id, business.id, validatedData);
       if (!workLog) {
         return res.status(404).json({ error: "Work log not found" });
