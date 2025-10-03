@@ -76,7 +76,7 @@ export function ObjectUploader({
 
   return (
     <>
-      <Button onClick={() => setShowModal(true)} className={buttonClassName}>
+      <Button type="button" onClick={() => setShowModal(true)} className={buttonClassName}>
         {children}
       </Button>
 
