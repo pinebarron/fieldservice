@@ -35,6 +35,10 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
     });
   };
 
+  const formatAddress = () => {
+    return `${workLog.city}, ${workLog.state} ${workLog.zipCode}`;
+  };
+
   return (
     <Card 
       className="hover:shadow-md transition-shadow cursor-pointer" 
@@ -54,7 +58,7 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
                 </h3>
                 <p className="text-sm text-muted-foreground mt-1" data-testid={`work-log-location-${workLog.id}`}>
                   <i className="fas fa-map-marker-alt mr-1"></i>
-                  {workLog.location}
+                  {formatAddress()}
                 </p>
                 <div className="flex flex-wrap gap-3 mt-3 text-sm">
                   <span className="text-muted-foreground" data-testid={`work-log-technician-${workLog.id}`}>

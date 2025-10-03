@@ -14,6 +14,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import type { UploadResult } from "@uppy/core";
 
+const US_STATES = [
+  "AL", "AK", "AZ", "AR", "CA", "CO", "CT", "DE", "FL", "GA",
+  "HI", "ID", "IL", "IN", "IA", "KS", "KY", "LA", "ME", "MD",
+  "MA", "MI", "MN", "MS", "MO", "MT", "NE", "NV", "NH", "NJ",
+  "NM", "NY", "NC", "ND", "OH", "OK", "OR", "PA", "RI", "SC",
+  "SD", "TN", "TX", "UT", "VT", "VA", "WA", "WV", "WI", "WY"
+];
+
 interface NewEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -30,7 +38,10 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
     defaultValues: {
       customerName: "",
       workType: "",
-      location: "",
+      locationName: "",
+      city: "",
+      state: "",
+      zipCode: "",
       technicianName: "Mike Johnson", // Default to current user
       serviceDate: new Date().toISOString().split('T')[0],
       startTime: null,
@@ -190,12 +201,62 @@ export function NewEntryModal({ isOpen, onClose, onSuccess }: NewEntryModalProps
                 />
                 <FormField
                   control={form.control}
-                  name="location"
+                  name="locationName"
                   render={({ field }) => (
                     <FormItem className="md:col-span-2">
-                      <FormLabel>Location Address *</FormLabel>
+                      <FormLabel>Location Name *</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="Enter full address" data-testid="input-location" />
+                        <Input {...field} placeholder="e.g., Customer Site, Building Name" data-testid="input-location-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="city"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>City *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter city" data-testid="input-city" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="state"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>State *</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger data-testid="select-state">
+                            <SelectValue placeholder="Select state" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {US_STATES.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zip Code *</FormLabel>
+                      <FormControl>
+                        <Input {...field} placeholder="Enter zip code" data-testid="input-zip-code" />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

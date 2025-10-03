@@ -115,7 +115,10 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Location</h4>
-              <p className="text-foreground" data-testid="detail-job-location">{workLog.location}</p>
+              <p className="text-foreground" data-testid="detail-job-location">
+                {workLog.locationName}<br />
+                {workLog.city}, {workLog.state} {workLog.zipCode}
+              </p>
             </div>
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Work Type</h4>
