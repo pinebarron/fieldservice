@@ -40,9 +40,17 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "capturing" | "captured" | "denied">("idle");
   const [gpsAddress, setGpsAddress] = useState<string | null>(null);
+  const [propertySearch, setPropertySearch] = useState("");
+  const [propertyPickerOpen, setPropertyPickerOpen] = useState(false);
+  const [linkedProperty, setLinkedProperty] = useState<Property | null>(prefillProperty ?? null);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
+    enabled: isOpen,
+  });
+
+  const { data: properties = [] } = useQuery<Property[]>({
+    queryKey: ["/api/properties"],
     enabled: isOpen,
   });
 
@@ -155,6 +163,23 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     },
   });
 
+  const applyProperty = (p: Property) => {
+    setLinkedProperty(p);
+    setPropertyPickerOpen(false);
+    setPropertySearch("");
+    form.setValue("customerName", p.customerName);
+    form.setValue("locationName", p.locationName);
+    form.setValue("city", p.city);
+    form.setValue("state", p.state);
+    form.setValue("zipCode", p.zipCode);
+    form.setValue("propertyId", p.id);
+  };
+
+  const clearProperty = () => {
+    setLinkedProperty(null);
+    form.setValue("propertyId", null);
+  };
+
   const handleClose = () => {
     form.reset();
     setPhotos([]);
@@ -162,6 +187,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     setGpsCoords(null);
     setGpsStatus("idle");
     setGpsAddress(null);
+    setLinkedProperty(prefillProperty ?? null);
+    setPropertyPickerOpen(false);
+    setPropertySearch("");
     onClose();
   };
 
@@ -271,13 +299,109 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
           <DialogTitle>{isEditMode ? "Edit Work Log Entry" : "Create New Work Log Entry"}</DialogTitle>
         </DialogHeader>
 
-        {prefillProperty && !isEditMode && (
-          <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
-            <i className="fas fa-building text-primary"></i>
-            <div>
-              <p className="text-sm font-medium text-foreground">Linked to: {prefillProperty.propertyName}</p>
-              <p className="text-xs text-muted-foreground">Property info has been auto-filled below</p>
-            </div>
+        {/* Property selector — new jobs only */}
+        {!isEditMode && (
+          <div className="relative">
+            {linkedProperty ? (
+              /* Linked state */
+              <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border-2 border-primary/30 rounded-lg">
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-building text-primary text-sm"></i>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{linkedProperty.propertyName}</p>
+                  <p className="text-xs text-muted-foreground truncate">
+                    {linkedProperty.customerName} · {linkedProperty.city}, {linkedProperty.state}
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setPropertyPickerOpen(true)}
+                    className="text-xs text-primary hover:underline px-2 py-1"
+                  >Change</button>
+                  <button
+                    type="button"
+                    onClick={clearProperty}
+                    className="w-6 h-6 rounded-full hover:bg-muted flex items-center justify-center text-muted-foreground hover:text-foreground"
+                  ><i className="fas fa-times text-xs"></i></button>
+                </div>
+              </div>
+            ) : (
+              /* Unlinked state */
+              <button
+                type="button"
+                onClick={() => setPropertyPickerOpen(v => !v)}
+                className="w-full flex items-center gap-3 px-4 py-3 border-2 border-dashed border-border rounded-lg hover:border-primary/40 hover:bg-primary/5 transition-colors text-left"
+                data-testid="button-select-property"
+              >
+                <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-building text-muted-foreground text-sm"></i>
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-foreground">Link to a saved property</p>
+                  <p className="text-xs text-muted-foreground">Auto-fill customer, address & location from your properties list</p>
+                </div>
+                <i className={`fas fa-chevron-${propertyPickerOpen ? "up" : "down"} text-muted-foreground ml-auto text-xs`}></i>
+              </button>
+            )}
+
+            {/* Dropdown picker */}
+            {propertyPickerOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-lg shadow-lg z-50 overflow-hidden">
+                <div className="p-2 border-b border-border">
+                  <div className="relative">
+                    <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs"></i>
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Search properties…"
+                      value={propertySearch}
+                      onChange={e => setPropertySearch(e.target.value)}
+                      className="w-full pl-8 pr-3 py-1.5 text-sm bg-muted rounded-md border-0 outline-none focus:ring-1 focus:ring-primary"
+                      data-testid="input-property-search"
+                    />
+                  </div>
+                </div>
+                <div className="max-h-52 overflow-y-auto">
+                  {properties.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No saved properties yet</p>
+                  ) : (() => {
+                    const filtered = properties.filter(p =>
+                      p.propertyName.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                      p.customerName.toLowerCase().includes(propertySearch.toLowerCase()) ||
+                      p.city.toLowerCase().includes(propertySearch.toLowerCase())
+                    );
+                    return filtered.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-6">No matches</p>
+                    ) : filtered.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => applyProperty(p)}
+                        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-muted transition-colors text-left border-b border-border/50 last:border-0"
+                        data-testid={`property-option-${p.id}`}
+                      >
+                        <div className="w-7 h-7 bg-primary/10 rounded-md flex items-center justify-center flex-shrink-0">
+                          <i className="fas fa-map-marker-alt text-primary text-xs"></i>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{p.propertyName}</p>
+                          <p className="text-xs text-muted-foreground truncate">{p.customerName} · {p.city}, {p.state} {p.zipCode}</p>
+                        </div>
+                      </button>
+                    ));
+                  })()}
+                </div>
+                <div className="p-2 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setPropertyPickerOpen(false)}
+                    className="w-full text-xs text-muted-foreground hover:text-foreground py-1"
+                  >Cancel</button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
