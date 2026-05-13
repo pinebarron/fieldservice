@@ -43,6 +43,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const [propertySearch, setPropertySearch] = useState("");
   const [propertyPickerOpen, setPropertyPickerOpen] = useState(false);
   const [linkedProperty, setLinkedProperty] = useState<Property | null>(prefillProperty ?? null);
+  const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
@@ -78,6 +79,10 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
 
   useEffect(() => {
     if (editWorkLog) {
+      const ids = (editWorkLog as any).technicianUserIds?.length
+        ? (editWorkLog as any).technicianUserIds
+        : [editWorkLog.technicianUserId];
+      setSelectedTechnicianIds(ids);
       form.reset({
         customerName: editWorkLog.customerName,
         workType: editWorkLog.workType,
@@ -87,7 +92,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         zipCode: editWorkLog.zipCode,
         businessId: editWorkLog.businessId,
         propertyId: editWorkLog.propertyId || null,
-        technicianUserId: editWorkLog.technicianUserId,
+        technicianUserId: ids[0],
         serviceDate: editWorkLog.serviceDate,
         startTime: editWorkLog.startTime || null,
         endTime: editWorkLog.endTime || null,
@@ -100,6 +105,8 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
       setPhotos(editWorkLog.photoMetadata || []);
       setUploadedPdfs(editWorkLog.pdfUrls || []);
     } else if (isOpen) {
+      const defaultId = user?.id || "";
+      setSelectedTechnicianIds(defaultId ? [defaultId] : []);
       form.reset({
         customerName: prefillProperty?.customerName || "",
         workType: "",
@@ -109,7 +116,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         zipCode: prefillProperty?.zipCode || "",
         businessId: "",
         propertyId: prefillProperty?.id || null,
-        technicianUserId: user?.id || "",
+        technicianUserId: defaultId,
         serviceDate: new Date().toISOString().split('T')[0],
         startTime: null,
         endTime: null,
@@ -180,6 +187,21 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     form.setValue("propertyId", null);
   };
 
+  const toggleTechnician = (userId: string) => {
+    setSelectedTechnicianIds(prev => {
+      if (prev.includes(userId)) {
+        if (prev.length === 1) return prev;
+        const next = prev.filter(id => id !== userId);
+        form.setValue("technicianUserId", next[0]);
+        return next;
+      } else {
+        const next = [...prev, userId];
+        if (prev.length === 0) form.setValue("technicianUserId", userId);
+        return next;
+      }
+    });
+  };
+
   const handleClose = () => {
     form.reset();
     setPhotos([]);
@@ -190,16 +212,20 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     setLinkedProperty(prefillProperty ?? null);
     setPropertyPickerOpen(false);
     setPropertySearch("");
+    setSelectedTechnicianIds(user?.id ? [user.id] : []);
     onClose();
   };
 
   const onSubmit = (data: InsertWorkLog) => {
+    const leadId = selectedTechnicianIds[0] || data.technicianUserId;
     saveWorkLogMutation.mutate({
       ...data,
+      technicianUserId: leadId,
+      technicianUserIds: selectedTechnicianIds.length ? selectedTechnicianIds : [leadId],
       imageUrls: photos.map(p => p.url),
       pdfUrls: uploadedPdfs,
       photoMetadata: photos,
-    });
+    } as any);
   };
 
   const reverseGeocode = async (lat: number, lng: number) => {
@@ -524,30 +550,46 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                 Service Details
               </h4>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="technicianUserId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Technician *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value || user?.id}>
-                        <FormControl>
-                          <SelectTrigger data-testid="select-technician">
-                            <SelectValue placeholder="Select technician" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {members.map((member) => (
-                            <SelectItem key={member.userId} value={member.userId}>
-                              {member.user.firstName} {member.user.lastName}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-sm font-medium text-foreground">
+                    Technicians * <span className="text-muted-foreground font-normal">(select all who worked on this job)</span>
+                  </label>
+                  <div className="border border-border rounded-md divide-y divide-border overflow-hidden max-h-48 overflow-y-auto" data-testid="technician-multiselect">
+                    {members.map((member) => {
+                      const isSelected = selectedTechnicianIds.includes(member.userId);
+                      const isLead = selectedTechnicianIds[0] === member.userId;
+                      return (
+                        <button
+                          key={member.userId}
+                          type="button"
+                          onClick={() => toggleTechnician(member.userId)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted"}`}
+                          data-testid={`technician-option-${member.userId}`}
+                        >
+                          <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
+                            {isSelected && <i className="fas fa-check text-primary-foreground" style={{ fontSize: "8px" }}></i>}
+                          </div>
+                          <div className="w-7 h-7 bg-primary/10 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-semibold text-primary">
+                            {member.user.firstName?.[0]}{member.user.lastName?.[0]}
+                          </div>
+                          <span className="flex-1 font-medium">{member.user.firstName} {member.user.lastName}</span>
+                          {isLead && isSelected && (
+                            <span className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded font-medium flex-shrink-0">Lead</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {selectedTechnicianIds.length === 0 && (
+                    <p className="text-xs text-destructive mt-1">Select at least one technician</p>
                   )}
-                />
+                  {selectedTechnicianIds.length > 1 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      <i className="fas fa-info-circle mr-1"></i>
+                      The first selected technician is marked as Lead
+                    </p>
+                  )}
+                </div>
                 <FormField
                   control={form.control}
                   name="serviceDate"

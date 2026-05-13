@@ -62,8 +62,21 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
                 </p>
                 <div className="flex flex-wrap gap-3 mt-3 text-sm">
                   <span className="text-muted-foreground" data-testid={`work-log-technician-${workLog.id}`}>
-                    <i className="fas fa-user mr-1"></i>
-                    {(workLog as any).technician?.firstName} {(workLog as any).technician?.lastName}
+                    {(() => {
+                      const ids: string[] = (workLog as any).technicianUserIds ?? [];
+                      const extra = ids.length > 1 ? ids.length - 1 : 0;
+                      return (
+                        <>
+                          <i className={`fas ${extra > 0 ? "fa-users" : "fa-user"} mr-1`}></i>
+                          {(workLog as any).technician?.firstName} {(workLog as any).technician?.lastName}
+                          {extra > 0 && (
+                            <span className="ml-1.5 text-xs bg-muted text-muted-foreground px-1.5 py-0.5 rounded-full font-medium">
+                              +{extra} more
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </span>
                   <span className="text-muted-foreground" data-testid={`work-log-date-${workLog.id}`}>
                     <i className="fas fa-calendar mr-1"></i>

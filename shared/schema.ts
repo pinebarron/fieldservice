@@ -163,6 +163,7 @@ export const workLogs = pgTable("work_logs", {
   workPerformed: text("work_performed").notNull(),
   additionalNotes: text("additional_notes"),
   status: text("status").notNull().default("completed"),
+  technicianUserIds: json("technician_user_ids").$type<string[]>().default([]),
   imageUrls: json("image_urls").$type<string[]>().default([]),
   pdfUrls: json("pdf_urls").$type<string[]>().default([]),
   photoMetadata: json("photo_metadata").$type<PhotoMeta[]>().default([]),

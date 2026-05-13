@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type WorkLog, type PhotoMeta } from "@shared/schema";
+import { type WorkLog, type PhotoMeta, type BusinessMember, type User } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -27,6 +27,24 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
     queryKey: ["/api/business"],
     enabled: isOpen,
   });
+
+  const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
+    queryKey: ["/api/business/members"],
+    enabled: isOpen,
+  });
+
+  const allTechnicianIds: string[] = (workLog as any).technicianUserIds?.length
+    ? (workLog as any).technicianUserIds
+    : [workLog.technicianUserId];
+
+  const resolveTechName = (userId: string) => {
+    if (userId === workLog.technicianUserId) {
+      const t = (workLog as any).technician;
+      if (t) return `${t.firstName ?? ""} ${t.lastName ?? ""}`.trim();
+    }
+    const m = members.find(m => m.userId === userId);
+    return m ? `${m.user.firstName ?? ""} ${m.user.lastName ?? ""}`.trim() : userId;
+  };
 
   const handleGenerateReport = async () => {
     setGeneratingPdf(true);
@@ -132,9 +150,18 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                 <i className="fas fa-calendar mr-1"></i>
                 {formatDate(workLog.serviceDate)}
               </span>
-              <span className="text-muted-foreground">
-                <i className="fas fa-user mr-1"></i>
-                {(workLog as any).technician?.firstName} {(workLog as any).technician?.lastName}
+              <span className="text-muted-foreground" data-testid="detail-technicians">
+                <i className={`fas ${allTechnicianIds.length > 1 ? "fa-users" : "fa-user"} mr-1`}></i>
+                {allTechnicianIds.length === 1
+                  ? resolveTechName(allTechnicianIds[0])
+                  : allTechnicianIds.map((id, i) => (
+                      <span key={id}>
+                        {resolveTechName(id)}
+                        {i === 0 && <span className="ml-1 text-xs text-primary font-medium">(Lead)</span>}
+                        {i < allTechnicianIds.length - 1 && <span className="mx-1 text-border">·</span>}
+                      </span>
+                    ))
+                }
               </span>
               <span className="status-badge px-3 py-1 bg-accent/10 text-accent rounded-full text-xs font-medium">
                 <i className="fas fa-check-circle mr-1"></i>
