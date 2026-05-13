@@ -4,6 +4,8 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import type { Estimate, EstimateLineItem, PricingItem, Property } from "@shared/schema";
+import { pdf } from "@react-pdf/renderer";
+import { EstimatePDF } from "@/components/EstimatePDF";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,6 +62,7 @@ export default function EstimateDetail({ params }: { params: { id: string } }) {
   const [isCatalogOpen, setIsCatalogOpen] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState("");
   const [isDirty, setIsDirty] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   const { data: estimate, isLoading } = useQuery<EstimateWithItems>({
     queryKey: ["/api/estimates", params.id],
@@ -72,6 +75,10 @@ export default function EstimateDetail({ params }: { params: { id: string } }) {
 
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ["/api/properties"],
+  });
+
+  const { data: business } = useQuery<{ name: string }>({
+    queryKey: ["/api/business"],
   });
 
   // Init form from loaded estimate
@@ -136,6 +143,34 @@ export default function EstimateDetail({ params }: { params: { id: string } }) {
     },
   });
 
+  const handleDownloadPdf = async () => {
+    if (!estimate) return;
+    setGeneratingPdf(true);
+    try {
+      const blob = await pdf(
+        <EstimatePDF
+          estimate={{ ...estimate, lineItems }}
+          businessName={business?.name}
+        />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const safeName = customerName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      link.download = `estimate_${safeName}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast({ title: "PDF downloaded", description: "Estimate saved to your device." });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error", description: "Failed to generate PDF.", variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
+
   // Live calculations
   const subtotal = lineItems.reduce((sum, li) => sum + n(li.quantity) * n(li.unitPrice), 0);
   const tax = subtotal * (n(taxRate) / 100);
@@ -198,6 +233,14 @@ export default function EstimateDetail({ params }: { params: { id: string } }) {
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               <Link href="/estimates"><Button variant="ghost" size="sm"><i className="fas fa-arrow-left mr-2"></i>Estimates</Button></Link>
+              <Button
+                variant="outline"
+                onClick={handleDownloadPdf}
+                disabled={generatingPdf || !estimate}
+                data-testid="button-download-pdf-estimate"
+              >
+                {generatingPdf ? <><i className="fas fa-spinner fa-spin mr-2"></i>Generating…</> : <><i className="fas fa-file-pdf mr-2"></i>PDF</>}
+              </Button>
               <Button onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-estimate">
                 {saveMutation.isPending ? <><i className="fas fa-spinner fa-spin mr-2"></i>Saving...</> : <><i className="fas fa-save mr-2"></i>Save</>}
               </Button>
@@ -466,6 +509,17 @@ export default function EstimateDetail({ params }: { params: { id: string } }) {
               <CardContent className="pt-4 space-y-2">
                 <Button className="w-full" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending} data-testid="button-save-estimate-right">
                   <i className="fas fa-save mr-2"></i> Save Estimate
+                </Button>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={handleDownloadPdf}
+                  disabled={generatingPdf || !estimate}
+                  data-testid="button-download-pdf-estimate-right"
+                >
+                  {generatingPdf
+                    ? <><i className="fas fa-spinner fa-spin mr-2"></i>Generating…</>
+                    : <><i className="fas fa-file-pdf mr-2"></i>Download PDF</>}
                 </Button>
                 <Button
                   variant="destructive"
