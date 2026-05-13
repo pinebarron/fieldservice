@@ -7,6 +7,7 @@ import { WorkLogCard } from "@/components/WorkLogCard";
 import { NewEntryModal } from "@/components/NewEntryModal";
 import { DetailJobModal } from "@/components/DetailJobModal";
 import { ImageLightbox } from "@/components/ImageLightbox";
+import { JobMap } from "@/components/JobMap";
 import { useAuth } from "@/hooks/useAuth";
 import { type WorkLog } from "@shared/schema";
 
@@ -27,6 +28,7 @@ export default function Dashboard() {
   const [lightboxMetadata, setLightboxMetadata] = useState<import("@shared/schema").PhotoMeta[] | undefined>(undefined);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
+  const [showMap, setShowMap] = useState(false);
   const { user } = useAuth();
 
   const { data: workLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useQuery<WorkLog[]>({
@@ -163,9 +165,14 @@ export default function Dashboard() {
               <p className="text-muted-foreground mt-1">Track and manage field service entries</p>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" className="flex items-center gap-2" data-testid="filter-button">
-                <i className="fas fa-filter"></i>
-                <span className="hidden sm:inline">Filters</span>
+              <Button
+                variant={showMap ? "default" : "outline"}
+                className="flex items-center gap-2"
+                onClick={() => setShowMap(v => !v)}
+                data-testid="toggle-map-button"
+              >
+                <i className="fas fa-map-marked-alt"></i>
+                <span className="hidden sm:inline">{showMap ? "Hide Map" : "Map View"}</span>
               </Button>
               <Button variant="outline" className="flex items-center gap-2" data-testid="export-button">
                 <i className="fas fa-download"></i>
@@ -240,6 +247,24 @@ export default function Dashboard() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Map View */}
+          {showMap && workLogs.length > 0 && (
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  <i className="fas fa-map-marker-alt mr-1.5"></i>
+                  Job Locations ({workLogs.length})
+                </h3>
+                <p className="text-xs text-muted-foreground">Click a pin to see job details</p>
+              </div>
+              <JobMap
+                workLogs={workLogs}
+                height="420px"
+                onPinClick={(wl) => setSelectedWorkLog(wl)}
+              />
+            </div>
+          )}
 
           {/* Filters */}
           <div className="flex gap-2 overflow-x-auto pb-2">

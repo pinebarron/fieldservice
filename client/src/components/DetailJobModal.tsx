@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { useToast } from "@/hooks/use-toast";
 import { pdf } from "@react-pdf/renderer";
 import { WorkReportPDF } from "@/components/WorkReportPDF";
+import { JobMap } from "@/components/JobMap";
 
 interface DetailJobModalProps {
   workLog: WorkLog;
@@ -148,10 +149,11 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Location</h4>
-              <p className="text-foreground" data-testid="detail-job-location">
+              <p className="text-foreground mb-3" data-testid="detail-job-location">
                 {workLog.locationName}<br />
                 {workLog.city}, {workLog.state} {workLog.zipCode}
               </p>
+              <JobMap workLogs={[workLog]} height="200px" singleJob />
             </div>
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Work Type</h4>
