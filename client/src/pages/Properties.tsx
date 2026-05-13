@@ -271,10 +271,16 @@ export default function Properties() {
                   <span className="hidden sm:inline">Work Logs</span>
                 </Button>
               </Link>
-              <Link href="/employees">
-                <Button variant="ghost" size="sm" data-testid="nav-employees">
+              <Link href="/team">
+                <Button variant="ghost" size="sm" data-testid="team-link">
                   <i className="fas fa-users mr-2"></i>
-                  <span className="hidden sm:inline">Employees</span>
+                  <span className="hidden sm:inline">Team</span>
+                </Button>
+              </Link>
+              <Link href="/vendors">
+                <Button variant="ghost" size="sm" data-testid="vendors-link">
+                  <i className="fas fa-handshake mr-2"></i>
+                  <span className="hidden sm:inline">Vendors</span>
                 </Button>
               </Link>
               <Button variant="ghost" size="sm" onClick={() => window.location.href = "/api/logout"} data-testid="logout-button">

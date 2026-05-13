@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema, insertPropertySchema, updatePropertySchema } from "@shared/schema";
+import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -108,6 +108,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/business/members/:id/role", isAuthenticated, async (req: any, res) => {
+    try {
+      const { role } = req.body;
+      if (!role) return res.status(400).json({ error: "Role is required" });
+      const member = await storage.updateBusinessMemberRole(req.params.id, role);
+      if (!member) return res.status(404).json({ error: "Member not found" });
+      res.json(member);
+    } catch (error) {
+      console.error("Error updating member role:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   app.delete("/api/business/members/:id", isAuthenticated, async (req: any, res) => {
     try {
       const deleted = await storage.removeBusinessMember(req.params.id);
@@ -117,6 +130,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(204).send();
     } catch (error) {
       console.error("Error removing business member:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Vendor Routes
+  app.post("/api/vendors", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+      const validatedData = insertVendorSchema.parse({ ...req.body, businessId: business.id });
+      const vendor = await storage.createVendor(validatedData);
+      res.status(201).json(vendor);
+    } catch (error) {
+      console.error("Error creating vendor:", error);
+      res.status(400).json({ error: "Invalid vendor data" });
+    }
+  });
+
+  app.get("/api/vendors", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.json([]);
+      const vendorList = await storage.getVendors(business.id);
+      res.json(vendorList);
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Vendor not found" });
+      const vendor = await storage.getVendor(req.params.id, business.id);
+      if (!vendor) return res.status(404).json({ error: "Vendor not found" });
+      res.json(vendor);
+    } catch (error) {
+      console.error("Error fetching vendor:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Vendor not found" });
+      const validatedData = updateVendorSchema.parse(req.body);
+      const vendor = await storage.updateVendor(req.params.id, business.id, validatedData);
+      if (!vendor) return res.status(404).json({ error: "Vendor not found" });
+      res.json(vendor);
+    } catch (error) {
+      console.error("Error updating vendor:", error);
+      res.status(400).json({ error: "Invalid vendor data" });
+    }
+  });
+
+  app.delete("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Vendor not found" });
+      const deleted = await storage.deleteVendor(req.params.id, business.id);
+      if (!deleted) return res.status(404).json({ error: "Vendor not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting vendor:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

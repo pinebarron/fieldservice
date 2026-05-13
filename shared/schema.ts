@@ -43,6 +43,27 @@ export const businessMembers = pgTable("business_members", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Vendors table
+export const vendors = pgTable("vendors", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  contactName: text("contact_name"),
+  contactEmail: text("contact_email"),
+  contactPhone: text("contact_phone"),
+  servicesProvided: json("services_provided").$type<string[]>().default([]),
+  regionsServed: json("regions_served").$type<string[]>().default([]),
+  insuranceProvider: text("insurance_provider"),
+  insurancePolicyNumber: text("insurance_policy_number"),
+  insuranceExpiry: text("insurance_expiry"),
+  licenseNumber: text("license_number"),
+  licenseExpiry: text("license_expiry"),
+  notes: text("notes"),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Properties table (job sites / property containers)
 export const properties = pgTable("properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -94,6 +115,12 @@ export const insertBusinessMemberSchema = createInsertSchema(businessMembers).om
   id: true,
   createdAt: true,
 });
+export const insertVendorSchema = createInsertSchema(vendors).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateVendorSchema = insertVendorSchema.partial();
 export const insertPropertySchema = createInsertSchema(properties).omit({
   id: true,
   createdAt: true,
@@ -114,6 +141,9 @@ export type Business = typeof businesses.$inferSelect;
 export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
 export type BusinessMember = typeof businessMembers.$inferSelect;
 export type InsertBusinessMember = z.infer<typeof insertBusinessMemberSchema>;
+export type Vendor = typeof vendors.$inferSelect;
+export type InsertVendor = z.infer<typeof insertVendorSchema>;
+export type UpdateVendor = z.infer<typeof updateVendorSchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type UpdateProperty = z.infer<typeof updatePropertySchema>;

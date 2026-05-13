@@ -103,10 +103,16 @@ export default function Dashboard() {
                   <span className="hidden sm:inline">Properties</span>
                 </Button>
               </Link>
-              <Link href="/employees">
-                <Button variant="ghost" size="sm" data-testid="employees-link">
+              <Link href="/team">
+                <Button variant="ghost" size="sm" data-testid="team-link">
                   <i className="fas fa-users mr-2"></i>
-                  <span className="hidden sm:inline">Employees</span>
+                  <span className="hidden sm:inline">Team</span>
+                </Button>
+              </Link>
+              <Link href="/vendors">
+                <Button variant="ghost" size="sm" data-testid="vendors-link">
+                  <i className="fas fa-handshake mr-2"></i>
+                  <span className="hidden sm:inline">Vendors</span>
                 </Button>
               </Link>
               <Button 

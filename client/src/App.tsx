@@ -8,10 +8,11 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Business } from "@shared/schema";
 import { Landing } from "@/pages/Landing";
 import { BusinessOnboarding } from "@/pages/BusinessOnboarding";
-import { EmployeeManagement } from "@/pages/EmployeeManagement";
+import { TeamManagement } from "@/pages/TeamManagement";
 import Dashboard from "@/pages/dashboard";
 import Properties from "@/pages/Properties";
 import PropertyDetail from "@/pages/PropertyDetail";
+import Vendors from "@/pages/Vendors";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -46,7 +47,9 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/properties" component={Properties} />
       <Route path="/properties/:id" component={PropertyDetail} />
-      <Route path="/employees" component={EmployeeManagement} />
+      <Route path="/team" component={TeamManagement} />
+      <Route path="/employees" component={TeamManagement} />
+      <Route path="/vendors" component={Vendors} />
       <Route component={NotFound} />
     </Switch>
   );

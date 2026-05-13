@@ -2,6 +2,7 @@ import {
   users,
   businesses,
   businessMembers,
+  vendors,
   properties,
   workLogs,
   type User,
@@ -10,6 +11,9 @@ import {
   type InsertBusiness,
   type BusinessMember,
   type InsertBusinessMember,
+  type Vendor,
+  type InsertVendor,
+  type UpdateVendor,
   type Property,
   type InsertProperty,
   type UpdateProperty,
@@ -36,7 +40,15 @@ export interface IStorage {
   // Business member operations
   addBusinessMember(member: InsertBusinessMember): Promise<BusinessMember>;
   getBusinessMembers(businessId: string): Promise<(BusinessMember & { user: User })[]>;
+  updateBusinessMemberRole(id: string, role: string): Promise<BusinessMember | undefined>;
   removeBusinessMember(id: string): Promise<boolean>;
+
+  // Vendor operations
+  createVendor(vendor: InsertVendor): Promise<Vendor>;
+  getVendors(businessId: string): Promise<Vendor[]>;
+  getVendor(id: string, businessId: string): Promise<Vendor | undefined>;
+  updateVendor(id: string, businessId: string, updates: UpdateVendor): Promise<Vendor | undefined>;
+  deleteVendor(id: string, businessId: string): Promise<boolean>;
 
   // Property operations
   createProperty(property: InsertProperty): Promise<Property>;
@@ -140,8 +152,55 @@ export class DatabaseStorage implements IStorage {
     return members;
   }
 
+  async updateBusinessMemberRole(id: string, role: string): Promise<BusinessMember | undefined> {
+    const [member] = await db
+      .update(businessMembers)
+      .set({ role })
+      .where(eq(businessMembers.id, id))
+      .returning();
+    return member;
+  }
+
   async removeBusinessMember(id: string): Promise<boolean> {
     const result = await db.delete(businessMembers).where(eq(businessMembers.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Vendor operations
+  async createVendor(vendorData: InsertVendor): Promise<Vendor> {
+    const [vendor] = await db.insert(vendors).values(vendorData as any).returning();
+    return vendor;
+  }
+
+  async getVendors(businessId: string): Promise<Vendor[]> {
+    return db
+      .select()
+      .from(vendors)
+      .where(eq(vendors.businessId, businessId))
+      .orderBy(desc(vendors.createdAt));
+  }
+
+  async getVendor(id: string, businessId: string): Promise<Vendor | undefined> {
+    const [vendor] = await db
+      .select()
+      .from(vendors)
+      .where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)));
+    return vendor;
+  }
+
+  async updateVendor(id: string, businessId: string, updates: UpdateVendor): Promise<Vendor | undefined> {
+    const [vendor] = await db
+      .update(vendors)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)))
+      .returning();
+    return vendor;
+  }
+
+  async deleteVendor(id: string, businessId: string): Promise<boolean> {
+    const result = await db
+      .delete(vendors)
+      .where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)));
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
