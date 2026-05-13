@@ -181,30 +181,86 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             </div>
           </div>
 
-          {/* Images Gallery */}
-          {workLog.imageUrls && workLog.imageUrls.length > 0 && (
-            <div>
-              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Images ({workLog.imageUrls.length})
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {workLog.imageUrls.map((url, index) => (
-                  <div
-                    key={index}
-                    className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform"
-                    onClick={() => onOpenLightbox(workLog.imageUrls!, index, workLog.photoMetadata ?? undefined)}
-                    data-testid={`detail-job-image-${index}`}
-                  >
-                    <img
-                      src={url}
-                      alt={`Installation photo ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+          {/* Images Gallery — grouped by Before / During / After */}
+          {workLog.imageUrls && workLog.imageUrls.length > 0 && (() => {
+            const meta: PhotoMeta[] = workLog.photoMetadata || [];
+            const allPhotos = workLog.imageUrls.map((url, i) => ({
+              url,
+              type: meta[i]?.type ?? "general",
+              originalIndex: i,
+            }));
+
+            const zones = [
+              { type: "before",  label: "Before Work",    icon: "fa-hourglass-start", border: "border-amber-300",  bg: "bg-amber-50 dark:bg-amber-950/20",  header: "bg-amber-500",  text: "text-amber-700 dark:text-amber-300" },
+              { type: "general", label: "During Work",    icon: "fa-camera",          border: "border-blue-300",   bg: "bg-blue-50 dark:bg-blue-950/20",    header: "bg-blue-500",   text: "text-blue-700 dark:text-blue-300" },
+              { type: "after",   label: "After Complete", icon: "fa-check-circle",    border: "border-green-300",  bg: "bg-green-50 dark:bg-green-950/20",  header: "bg-green-500",  text: "text-green-700 dark:text-green-300" },
+            ] as const;
+
+            const hasCategories = meta.length > 0;
+
+            return (
+              <div>
+                <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Photos ({workLog.imageUrls.length})
+                </h4>
+
+                {hasCategories ? (
+                  <div className="space-y-4">
+                    {zones.map(({ type, label, icon, border, bg, header }) => {
+                      const zonePhotos = allPhotos.filter(p => p.type === type);
+                      if (zonePhotos.length === 0) return null;
+                      return (
+                        <div key={type} className={`rounded-lg border-2 ${border} overflow-hidden`}>
+                          <div className={`${header} px-4 py-2 flex items-center justify-between`}>
+                            <span className="text-white text-sm font-semibold flex items-center gap-2">
+                              <i className={`fas ${icon}`}></i>
+                              {label}
+                            </span>
+                            <span className="text-white/80 text-xs">{zonePhotos.length} photo{zonePhotos.length !== 1 ? "s" : ""}</span>
+                          </div>
+                          <div className={`${bg} p-3`}>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                              {zonePhotos.map((p) => (
+                                <div
+                                  key={p.originalIndex}
+                                  className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-sm"
+                                  onClick={() => onOpenLightbox(workLog.imageUrls!, p.originalIndex, workLog.photoMetadata ?? undefined)}
+                                  data-testid={`detail-job-image-${p.originalIndex}`}
+                                >
+                                  <img
+                                    src={p.url}
+                                    alt={`${label} photo`}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                    {allPhotos.map((p) => (
+                      <div
+                        key={p.originalIndex}
+                        className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform"
+                        onClick={() => onOpenLightbox(workLog.imageUrls!, p.originalIndex, workLog.photoMetadata ?? undefined)}
+                        data-testid={`detail-job-image-${p.originalIndex}`}
+                      >
+                        <img
+                          src={p.url}
+                          alt={`Photo ${p.originalIndex + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* PDF Reports */}
           {workLog.pdfUrls && workLog.pdfUrls.length > 0 && (
