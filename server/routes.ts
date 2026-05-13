@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema } from "@shared/schema";
+import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema, insertPropertySchema, updatePropertySchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -121,6 +121,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Property Routes
+  app.post("/api/properties", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+      const validatedData = insertPropertySchema.parse({ ...req.body, businessId: business.id });
+      const property = await storage.createProperty(validatedData);
+      res.status(201).json(property);
+    } catch (error) {
+      console.error("Error creating property:", error);
+      res.status(400).json({ error: "Invalid property data" });
+    }
+  });
+
+  app.get("/api/properties", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.json([]);
+      const props = await storage.getProperties(business.id);
+      res.json(props);
+    } catch (error) {
+      console.error("Error fetching properties:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/properties/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Property not found" });
+      const property = await storage.getProperty(req.params.id, business.id);
+      if (!property) return res.status(404).json({ error: "Property not found" });
+      res.json(property);
+    } catch (error) {
+      console.error("Error fetching property:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/properties/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Property not found" });
+      const validatedData = updatePropertySchema.parse(req.body);
+      const property = await storage.updateProperty(req.params.id, business.id, validatedData);
+      if (!property) return res.status(404).json({ error: "Property not found" });
+      res.json(property);
+    } catch (error) {
+      console.error("Error updating property:", error);
+      res.status(400).json({ error: "Invalid property data" });
+    }
+  });
+
+  app.delete("/api/properties/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Property not found" });
+      const deleted = await storage.deleteProperty(req.params.id, business.id);
+      if (!deleted) return res.status(404).json({ error: "Property not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting property:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Work Log Routes (all protected)
   app.get("/api/work-logs", isAuthenticated, async (req: any, res) => {
     try {
@@ -130,7 +201,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.json([]);
       }
 
-      const { workType, customerName, technicianUserId, dateFrom, dateTo } = req.query;
+      const { workType, customerName, technicianUserId, dateFrom, dateTo, propertyId } = req.query;
       
       const filters = {
         workType: workType as string,
@@ -138,6 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         technicianUserId: technicianUserId as string,
         dateFrom: dateFrom as string,
         dateTo: dateTo as string,
+        propertyId: propertyId as string,
       };
 
       const workLogs = await storage.getWorkLogsByFilter(business.id, filters);

@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type User, type BusinessMember } from "@shared/schema";
+import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type Property, type User, type BusinessMember } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -28,9 +28,10 @@ interface NewEntryModalProps {
   onClose: () => void;
   onSuccess: () => void;
   editWorkLog?: WorkLog;
+  prefillProperty?: Property;
 }
 
-export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog }: NewEntryModalProps) {
+export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefillProperty }: NewEntryModalProps) {
   const { toast } = useToast();
   const { user } = useAuth();
   const isEditMode = !!editWorkLog;
@@ -74,6 +75,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog }: NewEn
         state: editWorkLog.state,
         zipCode: editWorkLog.zipCode,
         businessId: editWorkLog.businessId,
+        propertyId: editWorkLog.propertyId || null,
         technicianUserId: editWorkLog.technicianUserId,
         serviceDate: editWorkLog.serviceDate,
         startTime: editWorkLog.startTime || null,
@@ -88,13 +90,14 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog }: NewEn
       setUploadedPdfs(editWorkLog.pdfUrls || []);
     } else if (isOpen) {
       form.reset({
-        customerName: "",
+        customerName: prefillProperty?.customerName || "",
         workType: "",
-        locationName: "",
-        city: "",
-        state: "",
-        zipCode: "",
+        locationName: prefillProperty?.locationName || "",
+        city: prefillProperty?.city || "",
+        state: prefillProperty?.state || "",
+        zipCode: prefillProperty?.zipCode || "",
         businessId: "",
+        propertyId: prefillProperty?.id || null,
         technicianUserId: user?.id || "",
         serviceDate: new Date().toISOString().split('T')[0],
         startTime: null,
@@ -108,7 +111,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog }: NewEn
       setUploadedImages([]);
       setUploadedPdfs([]);
     }
-  }, [editWorkLog, isOpen, form, user]);
+  }, [editWorkLog, isOpen, prefillProperty, form, user]);
 
   const saveWorkLogMutation = useMutation({
     mutationFn: async (data: InsertWorkLog) => {
@@ -213,6 +216,16 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog }: NewEn
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Work Log Entry" : "Create New Work Log Entry"}</DialogTitle>
         </DialogHeader>
+
+        {prefillProperty && !isEditMode && (
+          <div className="flex items-center gap-3 px-4 py-3 bg-primary/5 border border-primary/20 rounded-lg">
+            <i className="fas fa-building text-primary"></i>
+            <div>
+              <p className="text-sm font-medium text-foreground">Linked to: {prefillProperty.propertyName}</p>
+              <p className="text-xs text-muted-foreground">Property info has been auto-filled below</p>
+            </div>
+          </div>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

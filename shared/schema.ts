@@ -43,10 +43,27 @@ export const businessMembers = pgTable("business_members", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Properties table (job sites / property containers)
+export const properties = pgTable("properties", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  propertyName: text("property_name").notNull(),
+  customerName: text("customer_name").notNull(),
+  locationName: text("location_name").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
+  status: text("status").notNull().default("active"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Work logs table
 export const workLogs = pgTable("work_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   businessId: varchar("business_id").notNull().references(() => businesses.id),
+  propertyId: varchar("property_id").references(() => properties.id),
   technicianUserId: varchar("technician_user_id").notNull().references(() => users.id),
   customerName: text("customer_name").notNull(),
   workType: text("work_type").notNull(),
@@ -77,6 +94,12 @@ export const insertBusinessMemberSchema = createInsertSchema(businessMembers).om
   id: true,
   createdAt: true,
 });
+export const insertPropertySchema = createInsertSchema(properties).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updatePropertySchema = insertPropertySchema.partial();
 export const insertWorkLogSchema = createInsertSchema(workLogs).omit({
   id: true,
   createdAt: true,
@@ -91,6 +114,9 @@ export type Business = typeof businesses.$inferSelect;
 export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
 export type BusinessMember = typeof businessMembers.$inferSelect;
 export type InsertBusinessMember = z.infer<typeof insertBusinessMemberSchema>;
+export type Property = typeof properties.$inferSelect;
+export type InsertProperty = z.infer<typeof insertPropertySchema>;
+export type UpdateProperty = z.infer<typeof updatePropertySchema>;
 export type WorkLog = typeof workLogs.$inferSelect;
 export type InsertWorkLog = z.infer<typeof insertWorkLogSchema>;
 export type UpdateWorkLog = z.infer<typeof updateWorkLogSchema>;

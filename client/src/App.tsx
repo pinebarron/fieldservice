@@ -10,6 +10,8 @@ import { Landing } from "@/pages/Landing";
 import { BusinessOnboarding } from "@/pages/BusinessOnboarding";
 import { EmployeeManagement } from "@/pages/EmployeeManagement";
 import Dashboard from "@/pages/dashboard";
+import Properties from "@/pages/Properties";
+import PropertyDetail from "@/pages/PropertyDetail";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -42,6 +44,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/properties" component={Properties} />
+      <Route path="/properties/:id" component={PropertyDetail} />
       <Route path="/employees" component={EmployeeManagement} />
       <Route component={NotFound} />
     </Switch>

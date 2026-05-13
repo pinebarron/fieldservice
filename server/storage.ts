@@ -2,6 +2,7 @@ import {
   users,
   businesses,
   businessMembers,
+  properties,
   workLogs,
   type User,
   type UpsertUser,
@@ -9,6 +10,9 @@ import {
   type InsertBusiness,
   type BusinessMember,
   type InsertBusinessMember,
+  type Property,
+  type InsertProperty,
+  type UpdateProperty,
   type WorkLog,
   type InsertWorkLog,
   type UpdateWorkLog,
@@ -33,6 +37,13 @@ export interface IStorage {
   addBusinessMember(member: InsertBusinessMember): Promise<BusinessMember>;
   getBusinessMembers(businessId: string): Promise<(BusinessMember & { user: User })[]>;
   removeBusinessMember(id: string): Promise<boolean>;
+
+  // Property operations
+  createProperty(property: InsertProperty): Promise<Property>;
+  getProperties(businessId: string): Promise<(Property & { workLogCount: number })[]>;
+  getProperty(id: string, businessId: string): Promise<Property | undefined>;
+  updateProperty(id: string, businessId: string, updates: UpdateProperty): Promise<Property | undefined>;
+  deleteProperty(id: string, businessId: string): Promise<boolean>;
   
   // Work log operations
   getWorkLogs(businessId: string): Promise<(WorkLog & { technician: User })[]>;
@@ -46,6 +57,7 @@ export interface IStorage {
     technicianUserId?: string;
     dateFrom?: string;
     dateTo?: string;
+    propertyId?: string;
   }): Promise<(WorkLog & { technician: User })[]>;
 }
 
@@ -133,12 +145,67 @@ export class DatabaseStorage implements IStorage {
     return result.rowCount ? result.rowCount > 0 : false;
   }
 
+  // Property operations
+  async createProperty(propertyData: InsertProperty): Promise<Property> {
+    const [property] = await db.insert(properties).values(propertyData).returning();
+    return property;
+  }
+
+  async getProperties(businessId: string): Promise<(Property & { workLogCount: number })[]> {
+    const props = await db
+      .select()
+      .from(properties)
+      .where(eq(properties.businessId, businessId))
+      .orderBy(desc(properties.createdAt));
+
+    const withCounts = await Promise.all(
+      props.map(async (p) => {
+        const [{ count }] = await db
+          .select({ count: sql<number>`count(*)::int` })
+          .from(workLogs)
+          .where(eq(workLogs.propertyId, p.id));
+        return { ...p, workLogCount: count };
+      })
+    );
+    return withCounts;
+  }
+
+  async getProperty(id: string, businessId: string): Promise<Property | undefined> {
+    const [property] = await db
+      .select()
+      .from(properties)
+      .where(and(eq(properties.id, id), eq(properties.businessId, businessId)));
+    return property;
+  }
+
+  async updateProperty(id: string, businessId: string, updates: UpdateProperty): Promise<Property | undefined> {
+    const [property] = await db
+      .update(properties)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(and(eq(properties.id, id), eq(properties.businessId, businessId)))
+      .returning();
+    return property;
+  }
+
+  async deleteProperty(id: string, businessId: string): Promise<boolean> {
+    // Unlink work logs from this property first
+    await db
+      .update(workLogs)
+      .set({ propertyId: null })
+      .where(and(eq(workLogs.propertyId, id), eq(workLogs.businessId, businessId)));
+    const result = await db
+      .delete(properties)
+      .where(and(eq(properties.id, id), eq(properties.businessId, businessId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
   // Work log operations
   async getWorkLogs(businessId: string): Promise<(WorkLog & { technician: User })[]> {
     const logs = await db
       .select({
         id: workLogs.id,
         businessId: workLogs.businessId,
+        propertyId: workLogs.propertyId,
         technicianUserId: workLogs.technicianUserId,
         customerName: workLogs.customerName,
         workType: workLogs.workType,
@@ -174,14 +241,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createWorkLog(workLogData: InsertWorkLog): Promise<WorkLog> {
-    const [workLog] = await db.insert(workLogs).values(workLogData).returning();
+    const [workLog] = await db.insert(workLogs).values(workLogData as any).returning();
     return workLog;
   }
 
   async updateWorkLog(id: string, businessId: string, updates: UpdateWorkLog): Promise<WorkLog | undefined> {
     const [workLog] = await db
       .update(workLogs)
-      .set({ ...updates, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() } as any)
       .where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId)))
       .returning();
     return workLog;
@@ -202,6 +269,7 @@ export class DatabaseStorage implements IStorage {
       technicianUserId?: string;
       dateFrom?: string;
       dateTo?: string;
+      propertyId?: string;
     }
   ): Promise<(WorkLog & { technician: User })[]> {
     const conditions = [eq(workLogs.businessId, businessId)];
@@ -226,10 +294,15 @@ export class DatabaseStorage implements IStorage {
       conditions.push(sql`${workLogs.serviceDate} <= ${filters.dateTo}`);
     }
 
+    if (filters.propertyId) {
+      conditions.push(eq(workLogs.propertyId, filters.propertyId));
+    }
+
     const logs = await db
       .select({
         id: workLogs.id,
         businessId: workLogs.businessId,
+        propertyId: workLogs.propertyId,
         technicianUserId: workLogs.technicianUserId,
         customerName: workLogs.customerName,
         workType: workLogs.workType,

@@ -97,6 +97,12 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/properties">
+                <Button variant="ghost" size="sm" data-testid="properties-link">
+                  <i className="fas fa-building mr-2"></i>
+                  <span className="hidden sm:inline">Properties</span>
+                </Button>
+              </Link>
               <Link href="/employees">
                 <Button variant="ghost" size="sm" data-testid="employees-link">
                   <i className="fas fa-users mr-2"></i>
