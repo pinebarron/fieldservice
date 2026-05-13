@@ -41,6 +41,15 @@ export const businesses = pgTable("businesses", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
   ownerId: varchar("owner_id").notNull().references(() => users.id),
+  address: text("address"),
+  city: text("city"),
+  state: text("state"),
+  zipCode: text("zip_code"),
+  phone: text("phone"),
+  overview: text("overview"),
+  hoursOfOperation: json("hours_of_operation").$type<Record<string, { open: string; close: string; closed: boolean }>>(),
+  brandColor: text("brand_color"),
+  logoUrl: text("logo_url"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -168,6 +177,18 @@ export const insertBusinessSchema = createInsertSchema(businesses).omit({
   createdAt: true,
   updatedAt: true,
 });
+export const updateBusinessSchema = z.object({
+  name: z.string().optional(),
+  address: z.string().optional(),
+  city: z.string().optional(),
+  state: z.string().optional(),
+  zipCode: z.string().optional(),
+  phone: z.string().optional(),
+  overview: z.string().optional(),
+  hoursOfOperation: z.record(z.object({ open: z.string(), close: z.string(), closed: z.boolean() })).optional(),
+  brandColor: z.string().optional(),
+  logoUrl: z.string().optional(),
+});
 export const insertBusinessMemberSchema = createInsertSchema(businessMembers).omit({
   id: true,
   createdAt: true,
@@ -216,6 +237,7 @@ export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
 export type Business = typeof businesses.$inferSelect;
 export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
+export type UpdateBusiness = z.infer<typeof updateBusinessSchema>;
 export type BusinessMember = typeof businessMembers.$inferSelect;
 export type InsertBusinessMember = z.infer<typeof insertBusinessMemberSchema>;
 export type Vendor = typeof vendors.$inferSelect;

@@ -16,6 +16,7 @@ import Vendors from "@/pages/Vendors";
 import Estimates from "@/pages/Estimates";
 import EstimateDetail from "@/pages/EstimateDetail";
 import PricingCatalog from "@/pages/PricingCatalog";
+import Settings from "@/pages/Settings";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -56,6 +57,7 @@ function Router() {
       <Route path="/estimates" component={Estimates} />
       <Route path="/estimates/:id" component={EstimateDetail} />
       <Route path="/pricing" component={PricingCatalog} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );

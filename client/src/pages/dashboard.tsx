@@ -125,6 +125,12 @@ export default function Dashboard() {
                   <span className="hidden sm:inline">Vendors</span>
                 </Button>
               </Link>
+              <Link href="/settings">
+                <Button variant="ghost" size="sm" data-testid="settings-link" title="Company Settings">
+                  <i className="fas fa-cog mr-2"></i>
+                  <span className="hidden sm:inline">Settings</span>
+                </Button>
+              </Link>
               <Button 
                 variant="ghost" 
                 size="sm" 

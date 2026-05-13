@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema } from "@shared/schema";
+import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, updateBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -54,6 +54,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching business:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/business/settings", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      if (business.ownerId !== userId) return res.status(403).json({ error: "Only the owner can update settings" });
+      const updates = updateBusinessSchema.parse(req.body);
+      const updated = await storage.updateBusiness(business.id, updates);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating business settings:", error);
+      res.status(400).json({ error: "Invalid data" });
     }
   });
 

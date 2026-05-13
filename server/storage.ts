@@ -12,6 +12,7 @@ import {
   type UpsertUser,
   type Business,
   type InsertBusiness,
+  type UpdateBusiness,
   type BusinessMember,
   type InsertBusinessMember,
   type Vendor,
@@ -48,7 +49,7 @@ export interface IStorage {
   getBusiness(id: string): Promise<Business | undefined>;
   getBusinessByOwnerId(ownerId: string): Promise<Business | undefined>;
   getBusinessByUserId(userId: string): Promise<Business | undefined>;
-  updateBusiness(id: string, name: string): Promise<Business | undefined>;
+  updateBusiness(id: string, updates: UpdateBusiness): Promise<Business | undefined>;
   
   // Business member operations
   addBusinessMember(member: InsertBusinessMember): Promise<BusinessMember>;
@@ -165,10 +166,10 @@ export class DatabaseStorage implements IStorage {
     return membership?.business;
   }
 
-  async updateBusiness(id: string, name: string): Promise<Business | undefined> {
+  async updateBusiness(id: string, updates: UpdateBusiness): Promise<Business | undefined> {
     const [business] = await db
       .update(businesses)
-      .set({ name, updatedAt: new Date() })
+      .set({ ...updates, updatedAt: new Date() })
       .where(eq(businesses.id, id))
       .returning();
     return business;
