@@ -35,13 +35,11 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const { toast } = useToast();
   const { user } = useAuth();
   const isEditMode = !!editWorkLog;
-  const [uploadedImages, setUploadedImages] = useState<string[]>(editWorkLog?.imageUrls || []);
+  const [photos, setPhotos] = useState<PhotoMeta[]>(editWorkLog?.photoMetadata || []);
   const [uploadedPdfs, setUploadedPdfs] = useState<string[]>(editWorkLog?.pdfUrls || []);
-  const [photoType, setPhotoType] = useState<"before" | "after" | "general">("general");
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "capturing" | "captured" | "denied">("idle");
   const [gpsAddress, setGpsAddress] = useState<string | null>(null);
-  const [photoMetadata, setPhotoMetadata] = useState<PhotoMeta[]>(editWorkLog?.photoMetadata || []);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
@@ -91,9 +89,8 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         imageUrls: editWorkLog.imageUrls || [],
         pdfUrls: editWorkLog.pdfUrls || [],
       });
-      setUploadedImages(editWorkLog.imageUrls || []);
+      setPhotos(editWorkLog.photoMetadata || []);
       setUploadedPdfs(editWorkLog.pdfUrls || []);
-      setPhotoMetadata(editWorkLog.photoMetadata || []);
     } else if (isOpen) {
       form.reset({
         customerName: prefillProperty?.customerName || "",
@@ -115,13 +112,11 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         pdfUrls: [],
         photoMetadata: [],
       });
-      setUploadedImages([]);
+      setPhotos([]);
       setUploadedPdfs([]);
-      setPhotoMetadata([]);
       setGpsCoords(null);
       setGpsStatus("idle");
       setGpsAddress(null);
-      setPhotoType("general");
     }
   }, [editWorkLog, isOpen, prefillProperty, form, user]);
 
@@ -162,22 +157,20 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
 
   const handleClose = () => {
     form.reset();
-    setUploadedImages([]);
+    setPhotos([]);
     setUploadedPdfs([]);
-    setPhotoMetadata([]);
     setGpsCoords(null);
     setGpsStatus("idle");
     setGpsAddress(null);
-    setPhotoType("general");
     onClose();
   };
 
   const onSubmit = (data: InsertWorkLog) => {
     saveWorkLogMutation.mutate({
       ...data,
-      imageUrls: uploadedImages,
+      imageUrls: photos.map(p => p.url),
       pdfUrls: uploadedPdfs,
-      photoMetadata,
+      photoMetadata: photos,
     });
   };
 
@@ -229,74 +222,47 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     );
   };
 
-  const updateImageType = (index: number, newType: "before" | "after" | "general") => {
-    setPhotoMetadata(prev =>
-      prev.map((m, i) => i === index ? { ...m, type: newType } : m)
-    );
-  };
-
   const handleGetUploadParameters = async () => {
     const response = await apiRequest("POST", "/api/objects/upload", {});
     const { uploadURL } = await response.json();
-    return {
-      method: "PUT" as const,
-      url: uploadURL,
-    };
+    return { method: "PUT" as const, url: uploadURL };
   };
 
-  const handleImageUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    const newImages: string[] = [];
-    const newMeta: PhotoMeta[] = [];
-    
-    for (const file of result.successful) {
-      try {
-        const response = await apiRequest("PUT", "/api/objects/finalize", {
-          objectUrl: file.uploadURL,
-        });
-        const { objectPath } = await response.json();
-        newImages.push(objectPath);
-        newMeta.push({
-          url: objectPath,
-          type: photoType,
-          ...(gpsCoords ? { lat: gpsCoords.lat, lng: gpsCoords.lng } : {}),
-          capturedAt: new Date().toISOString(),
-          technicianName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined : undefined,
-        });
-      } catch (error) {
-        console.error("Error finalizing image upload:", error);
+  const makeZoneHandler = (type: PhotoMeta["type"]) =>
+    async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
+      for (const file of result.successful) {
+        try {
+          const response = await apiRequest("PUT", "/api/objects/finalize", { objectUrl: file.uploadURL });
+          const { objectPath } = await response.json();
+          setPhotos(prev => [...prev, {
+            url: objectPath,
+            type,
+            ...(gpsCoords ? { lat: gpsCoords.lat, lng: gpsCoords.lng, address: gpsAddress || undefined } : {}),
+            capturedAt: new Date().toISOString(),
+            technicianName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined : undefined,
+          }]);
+        } catch (error) {
+          console.error("Error finalizing upload:", error);
+        }
       }
-    }
-    
-    setUploadedImages(prev => [...prev, ...newImages]);
-    setPhotoMetadata(prev => [...prev, ...newMeta]);
-  };
+    };
 
   const handlePdfUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    const newPdfs: string[] = [];
-    
     for (const file of result.successful) {
       try {
-        const response = await apiRequest("PUT", "/api/objects/finalize", {
-          objectUrl: file.uploadURL,
-        });
+        const response = await apiRequest("PUT", "/api/objects/finalize", { objectUrl: file.uploadURL });
         const { objectPath } = await response.json();
-        newPdfs.push(objectPath);
+        setUploadedPdfs(prev => [...prev, objectPath]);
       } catch (error) {
         console.error("Error finalizing PDF upload:", error);
       }
     }
-    
-    setUploadedPdfs(prev => [...prev, ...newPdfs]);
   };
 
-  const removeImage = (index: number) => {
-    setUploadedImages(prev => prev.filter((_, i) => i !== index));
-    setPhotoMetadata(prev => prev.filter((_, i) => i !== index));
-  };
-
-  const removePdf = (index: number) => {
-    setUploadedPdfs(prev => prev.filter((_, i) => i !== index));
-  };
+  const removePhoto = (index: number) => setPhotos(prev => prev.filter((_, i) => i !== index));
+  const updatePhotoType = (index: number, type: PhotoMeta["type"]) =>
+    setPhotos(prev => prev.map((p, i) => i === index ? { ...p, type } : p));
+  const removePdf = (index: number) => setUploadedPdfs(prev => prev.filter((_, i) => i !== index));
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -523,176 +489,175 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
             <div>
               <h4 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
                 <i className="fas fa-cloud-upload-alt text-primary"></i>
-                Upload Files
+                Photos &amp; Files
               </h4>
 
-              {/* Photo Type + GPS Controls */}
-              <div className="mb-4 p-3 bg-muted/50 rounded-lg border space-y-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground">Default tag for new uploads:</span>
-                  {(["before", "general", "after"] as const).map((t) => {
-                    const labels = { before: "Before", general: "General", after: "After" };
-                    const icons = { before: "fas fa-hourglass-start", general: "fas fa-camera", after: "fas fa-check-circle" };
-                    const colors = { before: "bg-amber-100 text-amber-700 border-amber-300", general: "bg-blue-100 text-blue-700 border-blue-300", after: "bg-green-100 text-green-700 border-green-300" };
-                    const activeColors = { before: "bg-amber-500 text-white border-amber-500", general: "bg-blue-500 text-white border-blue-500", after: "bg-green-500 text-white border-green-500" };
-                    return (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setPhotoType(t)}
-                        className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${photoType === t ? activeColors[t] : colors[t]}`}
-                        data-testid={`photo-type-${t}`}
-                      >
-                        <i className={`${icons[t]} mr-1`}></i>{labels[t]}
-                      </button>
-                    );
-                  })}
-                </div>
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <i className={`fas fa-map-marker-alt text-xs ${gpsStatus === "captured" ? "text-green-600" : gpsStatus === "denied" ? "text-red-500" : "text-muted-foreground"}`}></i>
-                    {gpsStatus === "capturing" && (
-                      <span className="text-xs text-muted-foreground"><i className="fas fa-spinner fa-spin mr-1"></i>Detecting location…</span>
-                    )}
-                    {gpsStatus === "captured" && (
-                      <span className="text-xs text-green-700 truncate">
-                        {gpsAddress || `${gpsCoords?.lat?.toFixed(4)}, ${gpsCoords?.lng?.toFixed(4)}`}
-                        {gpsAddress && gpsCoords && (
-                          <span className="text-green-600/70 ml-1">({gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)})</span>
-                        )}
-                      </span>
-                    )}
-                    {gpsStatus === "denied" && (
-                      <span className="text-xs text-red-600">Location access denied</span>
-                    )}
-                    {gpsStatus === "idle" && (
-                      <span className="text-xs text-muted-foreground">No location yet</span>
-                    )}
+              {/* GPS Location Card */}
+              <div className={`mb-5 rounded-xl border-2 p-4 transition-colors ${
+                gpsStatus === "captured" ? "border-green-300 bg-green-50 dark:bg-green-950/30" :
+                gpsStatus === "denied" ? "border-red-200 bg-red-50 dark:bg-red-950/30" :
+                "border-border bg-muted/30"
+              }`}>
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-white ${
+                    gpsStatus === "captured" ? "bg-green-500" :
+                    gpsStatus === "denied" ? "bg-red-400" :
+                    "bg-muted-foreground/40"
+                  }`}>
+                    <i className={`fas ${gpsStatus === "capturing" ? "fa-spinner fa-spin" : "fa-map-marker-alt"}`}></i>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground">
+                      {gpsStatus === "captured" ? "Location detected" :
+                       gpsStatus === "denied" ? "Location access denied" :
+                       gpsStatus === "capturing" ? "Detecting location…" :
+                       "Location not detected"}
+                    </p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {gpsStatus === "captured"
+                        ? `${gpsAddress ? gpsAddress + " · " : ""}${gpsCoords?.lat?.toFixed(5)}, ${gpsCoords?.lng?.toFixed(5)}`
+                        : gpsStatus === "denied"
+                        ? "Photos will be saved without a GPS tag"
+                        : "Your location will be stamped on each photo as proof of work"}
+                    </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => captureGps(false)}
                     disabled={gpsStatus === "capturing"}
-                    className={`text-xs px-3 py-1.5 rounded-full border font-medium flex items-center gap-1.5 transition-colors flex-shrink-0 ${
-                      gpsStatus === "captured"
-                        ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
-                        : gpsStatus === "denied"
-                        ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
-                        : "bg-card text-foreground border-border hover:bg-muted"
+                    className={`text-xs px-3 py-1.5 rounded-lg border font-medium flex items-center gap-1.5 transition-colors flex-shrink-0 ${
+                      gpsStatus === "captured" ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200" :
+                      gpsStatus === "denied" ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200" :
+                      "bg-card text-foreground border-border hover:bg-muted"
                     }`}
                     data-testid="button-capture-gps"
                   >
-                    <i className={`fas ${gpsStatus === "capturing" ? "fa-spinner fa-spin" : gpsStatus === "captured" ? "fa-redo" : "fa-location-arrow"}`}></i>
-                    {gpsStatus === "capturing" ? "Locating…" : gpsStatus === "captured" ? "Refresh" : "Detect Location"}
+                    <i className={`fas ${gpsStatus === "capturing" ? "fa-spinner fa-spin" : gpsStatus === "captured" ? "fa-sync-alt" : "fa-location-arrow"}`}></i>
+                    {gpsStatus === "capturing" ? "Locating…" : gpsStatus === "captured" ? "Refresh" : "Detect"}
                   </button>
                 </div>
               </div>
-              
-              {/* Image Upload */}
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-foreground mb-2">Images</label>
-                <ObjectUploader
-                  maxNumberOfFiles={10}
-                  maxFileSize={10485760}
-                  onGetUploadParameters={handleGetUploadParameters}
-                  onComplete={handleImageUploadComplete}
-                  buttonClassName="w-full"
-                >
-                  <div className="flex flex-col items-center gap-2 py-8">
-                    <i className="fas fa-image text-4xl text-muted-foreground"></i>
-                    <p className="text-foreground font-medium">Upload Images</p>
-                    <p className="text-sm text-muted-foreground">Drag and drop or click to browse</p>
-                    <p className="text-xs text-muted-foreground">Supports: JPG, PNG, HEIC (Max 10MB each)</p>
-                  </div>
-                </ObjectUploader>
-                
-                {uploadedImages.length > 0 && (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-xs text-muted-foreground font-medium">Tap a badge below each photo to change its type:</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      {uploadedImages.map((imageUrl, index) => {
-                        const meta = photoMetadata[index];
-                        const currentType = meta?.type ?? "general";
-                        const typeConfig = {
-                          before: { label: "Before", bg: "bg-amber-500 hover:bg-amber-600", icon: "fa-hourglass-start" },
-                          general: { label: "General", bg: "bg-blue-500 hover:bg-blue-600", icon: "fa-camera" },
-                          after: { label: "After", bg: "bg-green-500 hover:bg-green-600", icon: "fa-check-circle" },
-                        } as const;
-                        const nextType = { before: "general", general: "after", after: "before" } as const;
-                        const cfg = typeConfig[currentType];
-                        return (
-                          <div key={index} className="relative group">
-                            <img
-                              src={imageUrl}
-                              alt={`Uploaded ${index + 1}`}
-                              className="w-full h-24 rounded-lg object-cover"
-                            />
-                            {meta?.lat !== undefined && (
-                              <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
-                                <i className="fas fa-map-marker-alt"></i>
-                              </span>
+
+              {/* 3-Zone Photo Upload */}
+              {(() => {
+                const zones = [
+                  { type: "before" as const, label: "Before", icon: "fa-hourglass-start", border: "border-amber-300", bg: "bg-amber-50 dark:bg-amber-950/20", header: "bg-amber-500", pill: "bg-amber-500", desc: "Condition before work" },
+                  { type: "general" as const, label: "Site Photos", icon: "fa-camera", border: "border-blue-300", bg: "bg-blue-50 dark:bg-blue-950/20", header: "bg-blue-500", pill: "bg-blue-500", desc: "Work in progress" },
+                  { type: "after" as const, label: "After", icon: "fa-check-circle", border: "border-green-300", bg: "bg-green-50 dark:bg-green-950/20", header: "bg-green-500", pill: "bg-green-500", desc: "Completed result" },
+                ];
+                return (
+                  <div className="grid grid-cols-3 gap-3 mb-5">
+                    {zones.map(({ type, label, icon, border, bg, header, pill, desc }) => {
+                      const zonePhotos = photos
+                        .map((p, i) => ({ ...p, globalIndex: i }))
+                        .filter(p => p.type === type);
+                      return (
+                        <div key={type} className={`rounded-xl border-2 ${border} ${bg} overflow-hidden`}>
+                          {/* Zone header */}
+                          <div className={`${header} px-3 py-2 flex items-center gap-2`}>
+                            <i className={`fas ${icon} text-white text-sm`}></i>
+                            <span className="text-white text-sm font-semibold">{label}</span>
+                            {zonePhotos.length > 0 && (
+                              <span className="ml-auto bg-white/30 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{zonePhotos.length}</span>
                             )}
-                            <button
-                              type="button"
-                              onClick={() => removeImage(index)}
-                              className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs hover:bg-destructive/90 opacity-0 group-hover:opacity-100 transition-opacity"
-                              data-testid={`remove-image-${index}`}
-                            >
-                              ×
-                            </button>
-                            <button
-                              type="button"
-                              title="Click to change photo type"
-                              onClick={() => updateImageType(index, nextType[currentType])}
-                              className={`absolute bottom-1 left-1 right-1 text-white text-[10px] px-1.5 py-0.5 rounded-full font-semibold capitalize flex items-center justify-center gap-1 cursor-pointer transition-colors ${cfg.bg}`}
-                              data-testid={`image-type-badge-${index}`}
-                            >
-                              <i className={`fas ${cfg.icon}`}></i>{cfg.label}
-                            </button>
                           </div>
-                        );
-                      })}
-                    </div>
+                          {/* Photos grid */}
+                          <div className="p-2 space-y-2">
+                            {zonePhotos.length > 0 && (
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {zonePhotos.map(({ url, lat, globalIndex }) => (
+                                  <div key={globalIndex} className="relative group aspect-square">
+                                    <img src={url} alt="" className="w-full h-full rounded-lg object-cover" />
+                                    {lat !== undefined && (
+                                      <span className="absolute top-0.5 left-0.5 bg-black/60 text-white text-[9px] px-1 py-0.5 rounded-full">
+                                        <i className="fas fa-map-marker-alt"></i>
+                                      </span>
+                                    )}
+                                    <button
+                                      type="button"
+                                      onClick={() => removePhoto(globalIndex)}
+                                      className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-destructive text-white rounded-full text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                      data-testid={`remove-photo-${globalIndex}`}
+                                    >×</button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Move between zones */}
+                            {zonePhotos.length > 0 && (
+                              <div className="flex gap-1 flex-wrap">
+                                {zonePhotos.map(({ globalIndex }) => (
+                                  <div key={globalIndex} className="flex gap-0.5">
+                                    {(["before", "general", "after"] as const)
+                                      .filter(t => t !== type)
+                                      .map(t => {
+                                        const tLabels = { before: "→Before", general: "→Site", after: "→After" };
+                                        return (
+                                          <button key={t} type="button"
+                                            onClick={() => updatePhotoType(globalIndex, t)}
+                                            className="text-[9px] px-1 py-0.5 rounded bg-white/70 text-foreground/70 hover:bg-white border border-border/50"
+                                          >{tLabels[t]}</button>
+                                        );
+                                      })}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* Upload button for this zone */}
+                            <ObjectUploader
+                              maxNumberOfFiles={10}
+                              maxFileSize={10485760}
+                              onGetUploadParameters={handleGetUploadParameters}
+                              onComplete={makeZoneHandler(type)}
+                              buttonClassName="w-full"
+                            >
+                              <div className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium">
+                                <i className="fas fa-plus text-[10px]"></i>
+                                {zonePhotos.length === 0 ? `Add ${label}` : "Add more"}
+                              </div>
+                            </ObjectUploader>
+                            {zonePhotos.length === 0 && (
+                              <p className="text-[10px] text-center text-muted-foreground/70 pb-1">{desc}</p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                )}
-              </div>
+                );
+              })()}
 
               {/* PDF Upload */}
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Reports (PDF)</label>
+                <label className="block text-sm font-medium text-foreground mb-2">
+                  <i className="fas fa-file-pdf text-destructive mr-1.5"></i>
+                  PDF Reports
+                </label>
                 <ObjectUploader
                   maxNumberOfFiles={5}
-                  maxFileSize={26214400} // 25MB
+                  maxFileSize={26214400}
                   onGetUploadParameters={handleGetUploadParameters}
                   onComplete={handlePdfUploadComplete}
                   buttonClassName="w-full"
                 >
-                  <div className="flex flex-col items-center gap-2 py-8">
-                    <i className="fas fa-file-pdf text-4xl text-muted-foreground"></i>
-                    <p className="text-foreground font-medium">Upload PDF Reports</p>
-                    <p className="text-sm text-muted-foreground">Drag and drop or click to browse</p>
-                    <p className="text-xs text-muted-foreground">Supports: PDF files only (Max 25MB each)</p>
+                  <div className="flex flex-col items-center gap-2 py-6">
+                    <i className="fas fa-file-pdf text-3xl text-muted-foreground"></i>
+                    <p className="text-foreground font-medium text-sm">Upload PDF Reports</p>
+                    <p className="text-xs text-muted-foreground">PDF only · Max 25MB each</p>
                   </div>
                 </ObjectUploader>
-                
                 {uploadedPdfs.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    {uploadedPdfs.map((pdfUrl, index) => (
+                  <div className="space-y-2 mt-3">
+                    {uploadedPdfs.map((_, index) => (
                       <div key={index} className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                        <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                          <i className="fas fa-file-pdf text-destructive"></i>
+                        <div className="w-8 h-8 bg-destructive/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                          <i className="fas fa-file-pdf text-destructive text-sm"></i>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-foreground font-medium truncate">Report_{index + 1}.pdf</p>
-                          <p className="text-xs text-muted-foreground">PDF Document</p>
+                          <p className="text-sm text-foreground font-medium">Report_{index + 1}.pdf</p>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => removePdf(index)}
-                          className="text-destructive hover:text-destructive/80 transition-colors"
-                          data-testid={`remove-pdf-${index}`}
-                        >
-                          <i className="fas fa-trash"></i>
+                        <button type="button" onClick={() => removePdf(index)} className="text-destructive hover:text-destructive/80" data-testid={`remove-pdf-${index}`}>
+                          <i className="fas fa-trash text-sm"></i>
                         </button>
                       </div>
                     ))}
