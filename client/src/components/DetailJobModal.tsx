@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { type WorkLog, type PhotoMeta } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { pdf } from "@react-pdf/renderer";
+import { WorkReportPDF } from "@/components/WorkReportPDF";
 
 interface DetailJobModalProps {
   workLog: WorkLog;
@@ -18,6 +20,36 @@ interface DetailJobModalProps {
 export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRefresh, onEdit }: DetailJobModalProps) {
   const { toast } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
+
+  const { data: business } = useQuery<{ name: string }>({
+    queryKey: ["/api/business"],
+    enabled: isOpen,
+  });
+
+  const handleGenerateReport = async () => {
+    setGeneratingPdf(true);
+    try {
+      const blob = await pdf(
+        <WorkReportPDF workLog={workLog} businessName={business?.name} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const safeName = workLog.customerName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      link.download = `work_report_${safeName}_${workLog.serviceDate}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast({ title: "Report downloaded", description: "Work summary PDF saved to your device." });
+    } catch (err) {
+      console.error(err);
+      toast({ title: "Error", description: "Failed to generate PDF report.", variant: "destructive" });
+    } finally {
+      setGeneratingPdf(false);
+    }
+  };
 
   const deleteWorkLogMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -247,9 +279,18 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
               <i className="fas fa-edit mr-2"></i>
               Edit Entry
             </Button>
-            <Button variant="outline" className="flex-1" data-testid="button-share-entry">
-              <i className="fas fa-share-alt mr-2"></i>
-              Share
+            <Button
+              variant="outline"
+              className="flex-1 border-primary text-primary hover:bg-primary/10"
+              onClick={handleGenerateReport}
+              disabled={generatingPdf}
+              data-testid="button-generate-report"
+            >
+              {generatingPdf ? (
+                <><i className="fas fa-spinner fa-spin mr-2"></i>Generating…</>
+              ) : (
+                <><i className="fas fa-file-pdf mr-2"></i>Download Report</>
+              )}
             </Button>
             <Button
               variant={showDeleteConfirm ? "destructive" : "outline"}
