@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type Property, type User, type BusinessMember } from "@shared/schema";
+import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type Property, type User, type BusinessMember, type PhotoMeta } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { ObjectUploader } from "@/components/ObjectUploader";
@@ -37,6 +37,10 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const isEditMode = !!editWorkLog;
   const [uploadedImages, setUploadedImages] = useState<string[]>(editWorkLog?.imageUrls || []);
   const [uploadedPdfs, setUploadedPdfs] = useState<string[]>(editWorkLog?.pdfUrls || []);
+  const [photoType, setPhotoType] = useState<"before" | "after" | "general">("general");
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [gpsStatus, setGpsStatus] = useState<"idle" | "capturing" | "captured" | "denied">("idle");
+  const [photoMetadata, setPhotoMetadata] = useState<PhotoMeta[]>(editWorkLog?.photoMetadata || []);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
@@ -88,6 +92,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
       });
       setUploadedImages(editWorkLog.imageUrls || []);
       setUploadedPdfs(editWorkLog.pdfUrls || []);
+      setPhotoMetadata(editWorkLog.photoMetadata || []);
     } else if (isOpen) {
       form.reset({
         customerName: prefillProperty?.customerName || "",
@@ -107,9 +112,14 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         status: "completed",
         imageUrls: [],
         pdfUrls: [],
+        photoMetadata: [],
       });
       setUploadedImages([]);
       setUploadedPdfs([]);
+      setPhotoMetadata([]);
+      setGpsCoords(null);
+      setGpsStatus("idle");
+      setPhotoType("general");
     }
   }, [editWorkLog, isOpen, prefillProperty, form, user]);
 
@@ -146,6 +156,10 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     form.reset();
     setUploadedImages([]);
     setUploadedPdfs([]);
+    setPhotoMetadata([]);
+    setGpsCoords(null);
+    setGpsStatus("idle");
+    setPhotoType("general");
     onClose();
   };
 
@@ -154,7 +168,28 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
       ...data,
       imageUrls: uploadedImages,
       pdfUrls: uploadedPdfs,
+      photoMetadata,
     });
+  };
+
+  const captureGps = () => {
+    if (!navigator.geolocation) {
+      toast({ title: "GPS not available", description: "Your browser does not support geolocation", variant: "destructive" });
+      return;
+    }
+    setGpsStatus("capturing");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGpsStatus("captured");
+        toast({ title: "Location captured", description: `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}` });
+      },
+      () => {
+        setGpsStatus("denied");
+        toast({ title: "Location denied", description: "Permission was denied or location unavailable", variant: "destructive" });
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const handleGetUploadParameters = async () => {
@@ -168,6 +203,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
 
   const handleImageUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
     const newImages: string[] = [];
+    const newMeta: PhotoMeta[] = [];
     
     for (const file of result.successful) {
       try {
@@ -176,12 +212,20 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         });
         const { objectPath } = await response.json();
         newImages.push(objectPath);
+        newMeta.push({
+          url: objectPath,
+          type: photoType,
+          ...(gpsCoords ? { lat: gpsCoords.lat, lng: gpsCoords.lng } : {}),
+          capturedAt: new Date().toISOString(),
+          technicianName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined : undefined,
+        });
       } catch (error) {
         console.error("Error finalizing image upload:", error);
       }
     }
     
     setUploadedImages(prev => [...prev, ...newImages]);
+    setPhotoMetadata(prev => [...prev, ...newMeta]);
   };
 
   const handlePdfUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
@@ -204,6 +248,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
 
   const removeImage = (index: number) => {
     setUploadedImages(prev => prev.filter((_, i) => i !== index));
+    setPhotoMetadata(prev => prev.filter((_, i) => i !== index));
   };
 
   const removePdf = (index: number) => {
@@ -437,6 +482,54 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                 <i className="fas fa-cloud-upload-alt text-primary"></i>
                 Upload Files
               </h4>
+
+              {/* Photo Type + GPS Controls */}
+              <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg border">
+                <div className="flex items-center gap-1">
+                  <span className="text-xs font-medium text-muted-foreground mr-1">Tag as:</span>
+                  {(["before", "general", "after"] as const).map((t) => {
+                    const labels = { before: "Before", general: "General", after: "After" };
+                    const icons = { before: "fas fa-hourglass-start", general: "fas fa-camera", after: "fas fa-check-circle" };
+                    const colors = { before: "bg-amber-100 text-amber-700 border-amber-300", general: "bg-blue-100 text-blue-700 border-blue-300", after: "bg-green-100 text-green-700 border-green-300" };
+                    const activeColors = { before: "bg-amber-500 text-white border-amber-500", general: "bg-blue-500 text-white border-blue-500", after: "bg-green-500 text-white border-green-500" };
+                    return (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setPhotoType(t)}
+                        className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${photoType === t ? activeColors[t] : colors[t]}`}
+                        data-testid={`photo-type-${t}`}
+                      >
+                        <i className={`${icons[t]} mr-1`}></i>{labels[t]}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  {gpsStatus === "captured" && gpsCoords && (
+                    <span className="text-xs text-green-600 flex items-center gap-1">
+                      <i className="fas fa-map-marker-alt"></i>
+                      {gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={captureGps}
+                    disabled={gpsStatus === "capturing"}
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium flex items-center gap-1.5 transition-colors ${
+                      gpsStatus === "captured"
+                        ? "bg-green-100 text-green-700 border-green-300"
+                        : gpsStatus === "denied"
+                        ? "bg-red-100 text-red-700 border-red-300"
+                        : "bg-card text-foreground border-border hover:bg-muted"
+                    }`}
+                    data-testid="button-capture-gps"
+                  >
+                    <i className={`fas ${gpsStatus === "capturing" ? "fa-spinner fa-spin" : gpsStatus === "captured" ? "fa-map-marker-alt" : "fa-location-arrow"}`}></i>
+                    {gpsStatus === "capturing" ? "Locating..." : gpsStatus === "captured" ? "GPS Ready" : gpsStatus === "denied" ? "GPS Denied" : "Capture GPS"}
+                  </button>
+                </div>
+              </div>
               
               {/* Image Upload */}
               <div className="mb-4">
@@ -458,23 +551,37 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                 
                 {uploadedImages.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                    {uploadedImages.map((imageUrl, index) => (
-                      <div key={index} className="relative">
-                        <img
-                          src={imageUrl}
-                          alt={`Uploaded ${index + 1}`}
-                          className="w-full h-24 rounded-lg object-cover"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => removeImage(index)}
-                          className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs hover:bg-destructive/90"
-                          data-testid={`remove-image-${index}`}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    ))}
+                    {uploadedImages.map((imageUrl, index) => {
+                      const meta = photoMetadata[index];
+                      const typeColors = { before: "bg-amber-500", after: "bg-green-500", general: "bg-blue-500" };
+                      return (
+                        <div key={index} className="relative">
+                          <img
+                            src={imageUrl}
+                            alt={`Uploaded ${index + 1}`}
+                            className="w-full h-24 rounded-lg object-cover"
+                          />
+                          {meta && (
+                            <span className={`absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${typeColors[meta.type] ?? "bg-gray-500"}`}>
+                              {meta.type}
+                            </span>
+                          )}
+                          {meta?.lat !== undefined && (
+                            <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                              <i className="fas fa-map-marker-alt"></i>
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs hover:bg-destructive/90"
+                            data-testid={`remove-image-${index}`}
+                          >
+                            ×
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>

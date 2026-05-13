@@ -271,6 +271,12 @@ export default function Properties() {
                   <span className="hidden sm:inline">Work Logs</span>
                 </Button>
               </Link>
+              <Link href="/estimates">
+                <Button variant="ghost" size="sm" data-testid="estimates-link">
+                  <i className="fas fa-file-invoice-dollar mr-2"></i>
+                  <span className="hidden sm:inline">Estimates</span>
+                </Button>
+              </Link>
               <Link href="/team">
                 <Button variant="ghost" size="sm" data-testid="team-link">
                   <i className="fas fa-users mr-2"></i>

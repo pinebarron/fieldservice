@@ -13,6 +13,9 @@ import Dashboard from "@/pages/dashboard";
 import Properties from "@/pages/Properties";
 import PropertyDetail from "@/pages/PropertyDetail";
 import Vendors from "@/pages/Vendors";
+import Estimates from "@/pages/Estimates";
+import EstimateDetail from "@/pages/EstimateDetail";
+import PricingCatalog from "@/pages/PricingCatalog";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -50,6 +53,9 @@ function Router() {
       <Route path="/team" component={TeamManagement} />
       <Route path="/employees" component={TeamManagement} />
       <Route path="/vendors" component={Vendors} />
+      <Route path="/estimates" component={Estimates} />
+      <Route path="/estimates/:id" component={EstimateDetail} />
+      <Route path="/pricing" component={PricingCatalog} />
       <Route component={NotFound} />
     </Switch>
   );

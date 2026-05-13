@@ -24,6 +24,7 @@ export default function Dashboard() {
   const [selectedWorkLog, setSelectedWorkLog] = useState<WorkLog | null>(null);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxMetadata, setLightboxMetadata] = useState<import("@shared/schema").PhotoMeta[] | undefined>(undefined);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
   const { user } = useAuth();
@@ -49,9 +50,10 @@ export default function Dashboard() {
     return log.workType.toLowerCase().includes(activeFilter);
   });
 
-  const handleOpenLightbox = (images: string[], index: number) => {
+  const handleOpenLightbox = (images: string[], index: number, metadata?: import("@shared/schema").PhotoMeta[]) => {
     setLightboxImages(images);
     setLightboxIndex(index);
+    setLightboxMetadata(metadata);
     setIsLightboxOpen(true);
   };
 
@@ -101,6 +103,12 @@ export default function Dashboard() {
                 <Button variant="ghost" size="sm" data-testid="properties-link">
                   <i className="fas fa-building mr-2"></i>
                   <span className="hidden sm:inline">Properties</span>
+                </Button>
+              </Link>
+              <Link href="/estimates">
+                <Button variant="ghost" size="sm" data-testid="estimates-link">
+                  <i className="fas fa-file-invoice-dollar mr-2"></i>
+                  <span className="hidden sm:inline">Estimates</span>
                 </Button>
               </Link>
               <Link href="/team">
@@ -320,6 +328,7 @@ export default function Dashboard() {
         isOpen={isLightboxOpen}
         onClose={() => setIsLightboxOpen(false)}
         onIndexChange={setLightboxIndex}
+        metadata={lightboxMetadata}
       />
     </div>
   );

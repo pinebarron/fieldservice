@@ -3,6 +3,17 @@ import { pgTable, text, varchar, timestamp, json, index } from "drizzle-orm/pg-c
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Photo metadata type for GPS-tagged images
+export type PhotoMeta = {
+  url: string;
+  type: "before" | "after" | "general";
+  lat?: number;
+  lng?: number;
+  address?: string;
+  capturedAt: string;
+  technicianName?: string;
+};
+
 // Session storage table (required for Replit Auth)
 export const sessions = pgTable(
   "sessions",
@@ -80,6 +91,51 @@ export const properties = pgTable("properties", {
   updatedAt: timestamp("updated_at").defaultNow(),
 });
 
+// Pricing items (business rate card / catalog)
+export const pricingItems = pgTable("pricing_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  category: text("category").notNull().default("General"),
+  name: text("name").notNull(),
+  description: text("description"),
+  unit: text("unit").notNull().default("each"),
+  unitPrice: text("unit_price").notNull().default("0"),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Estimates table
+export const estimates = pgTable("estimates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  propertyId: varchar("property_id").references(() => properties.id),
+  title: text("title").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerEmail: text("customer_email"),
+  customerPhone: text("customer_phone"),
+  description: text("description"),
+  status: text("status").notNull().default("draft"),
+  validUntil: text("valid_until"),
+  taxRate: text("tax_rate").notNull().default("0"),
+  discountAmount: text("discount_amount").notNull().default("0"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Estimate line items table
+export const estimateLineItems = pgTable("estimate_line_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  estimateId: varchar("estimate_id").notNull().references(() => estimates.id),
+  pricingItemId: varchar("pricing_item_id").references(() => pricingItems.id),
+  description: text("description").notNull(),
+  quantity: text("quantity").notNull().default("1"),
+  unit: text("unit").notNull().default("each"),
+  unitPrice: text("unit_price").notNull().default("0"),
+  sortOrder: text("sort_order").notNull().default("0"),
+});
+
 // Work logs table
 export const workLogs = pgTable("work_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -100,6 +156,7 @@ export const workLogs = pgTable("work_logs", {
   status: text("status").notNull().default("completed"),
   imageUrls: json("image_urls").$type<string[]>().default([]),
   pdfUrls: json("pdf_urls").$type<string[]>().default([]),
+  photoMetadata: json("photo_metadata").$type<PhotoMeta[]>().default([]),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -127,6 +184,26 @@ export const insertPropertySchema = createInsertSchema(properties).omit({
   updatedAt: true,
 });
 export const updatePropertySchema = insertPropertySchema.partial();
+
+export const insertPricingItemSchema = createInsertSchema(pricingItems).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updatePricingItemSchema = insertPricingItemSchema.partial();
+
+export const insertEstimateSchema = createInsertSchema(estimates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateEstimateSchema = insertEstimateSchema.partial();
+
+export const insertEstimateLineItemSchema = createInsertSchema(estimateLineItems).omit({
+  id: true,
+});
+export const updateEstimateLineItemSchema = insertEstimateLineItemSchema.partial();
+
 export const insertWorkLogSchema = createInsertSchema(workLogs).omit({
   id: true,
   createdAt: true,
@@ -147,6 +224,15 @@ export type UpdateVendor = z.infer<typeof updateVendorSchema>;
 export type Property = typeof properties.$inferSelect;
 export type InsertProperty = z.infer<typeof insertPropertySchema>;
 export type UpdateProperty = z.infer<typeof updatePropertySchema>;
+export type PricingItem = typeof pricingItems.$inferSelect;
+export type InsertPricingItem = z.infer<typeof insertPricingItemSchema>;
+export type UpdatePricingItem = z.infer<typeof updatePricingItemSchema>;
+export type Estimate = typeof estimates.$inferSelect;
+export type InsertEstimate = z.infer<typeof insertEstimateSchema>;
+export type UpdateEstimate = z.infer<typeof updateEstimateSchema>;
+export type EstimateLineItem = typeof estimateLineItems.$inferSelect;
+export type InsertEstimateLineItem = z.infer<typeof insertEstimateLineItemSchema>;
+export type UpdateEstimateLineItem = z.infer<typeof updateEstimateLineItemSchema>;
 export type WorkLog = typeof workLogs.$inferSelect;
 export type InsertWorkLog = z.infer<typeof insertWorkLogSchema>;
 export type UpdateWorkLog = z.infer<typeof updateWorkLogSchema>;

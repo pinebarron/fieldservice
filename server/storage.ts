@@ -4,6 +4,9 @@ import {
   businessMembers,
   vendors,
   properties,
+  pricingItems,
+  estimates,
+  estimateLineItems,
   workLogs,
   type User,
   type UpsertUser,
@@ -17,6 +20,15 @@ import {
   type Property,
   type InsertProperty,
   type UpdateProperty,
+  type PricingItem,
+  type InsertPricingItem,
+  type UpdatePricingItem,
+  type Estimate,
+  type InsertEstimate,
+  type UpdateEstimate,
+  type EstimateLineItem,
+  type InsertEstimateLineItem,
+  type UpdateEstimateLineItem,
   type WorkLog,
   type InsertWorkLog,
   type UpdateWorkLog,
@@ -49,6 +61,24 @@ export interface IStorage {
   getVendor(id: string, businessId: string): Promise<Vendor | undefined>;
   updateVendor(id: string, businessId: string, updates: UpdateVendor): Promise<Vendor | undefined>;
   deleteVendor(id: string, businessId: string): Promise<boolean>;
+
+  // Pricing item operations
+  createPricingItem(item: InsertPricingItem): Promise<PricingItem>;
+  getPricingItems(businessId: string): Promise<PricingItem[]>;
+  updatePricingItem(id: string, businessId: string, updates: UpdatePricingItem): Promise<PricingItem | undefined>;
+  deletePricingItem(id: string, businessId: string): Promise<boolean>;
+
+  // Estimate operations
+  createEstimate(estimate: InsertEstimate): Promise<Estimate>;
+  getEstimates(businessId: string): Promise<Estimate[]>;
+  getEstimate(id: string, businessId: string): Promise<Estimate | undefined>;
+  updateEstimate(id: string, businessId: string, updates: UpdateEstimate): Promise<Estimate | undefined>;
+  deleteEstimate(id: string, businessId: string): Promise<boolean>;
+  getEstimateLineItems(estimateId: string): Promise<EstimateLineItem[]>;
+  addEstimateLineItem(item: InsertEstimateLineItem): Promise<EstimateLineItem>;
+  updateEstimateLineItem(id: string, updates: UpdateEstimateLineItem): Promise<EstimateLineItem | undefined>;
+  deleteEstimateLineItem(id: string): Promise<boolean>;
+  replaceEstimateLineItems(estimateId: string, items: Omit<InsertEstimateLineItem, "estimateId">[]): Promise<EstimateLineItem[]>;
 
   // Property operations
   createProperty(property: InsertProperty): Promise<Property>;
@@ -202,6 +232,109 @@ export class DatabaseStorage implements IStorage {
       .delete(vendors)
       .where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)));
     return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Pricing item operations
+  async createPricingItem(itemData: InsertPricingItem): Promise<PricingItem> {
+    const [item] = await db.insert(pricingItems).values(itemData as any).returning();
+    return item;
+  }
+
+  async getPricingItems(businessId: string): Promise<PricingItem[]> {
+    return db
+      .select()
+      .from(pricingItems)
+      .where(eq(pricingItems.businessId, businessId))
+      .orderBy(pricingItems.category, pricingItems.name);
+  }
+
+  async updatePricingItem(id: string, businessId: string, updates: UpdatePricingItem): Promise<PricingItem | undefined> {
+    const [item] = await db
+      .update(pricingItems)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(eq(pricingItems.id, id), eq(pricingItems.businessId, businessId)))
+      .returning();
+    return item;
+  }
+
+  async deletePricingItem(id: string, businessId: string): Promise<boolean> {
+    const result = await db
+      .delete(pricingItems)
+      .where(and(eq(pricingItems.id, id), eq(pricingItems.businessId, businessId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Estimate operations
+  async createEstimate(estimateData: InsertEstimate): Promise<Estimate> {
+    const [estimate] = await db.insert(estimates).values(estimateData as any).returning();
+    return estimate;
+  }
+
+  async getEstimates(businessId: string): Promise<Estimate[]> {
+    return db
+      .select()
+      .from(estimates)
+      .where(eq(estimates.businessId, businessId))
+      .orderBy(desc(estimates.createdAt));
+  }
+
+  async getEstimate(id: string, businessId: string): Promise<Estimate | undefined> {
+    const [estimate] = await db
+      .select()
+      .from(estimates)
+      .where(and(eq(estimates.id, id), eq(estimates.businessId, businessId)));
+    return estimate;
+  }
+
+  async updateEstimate(id: string, businessId: string, updates: UpdateEstimate): Promise<Estimate | undefined> {
+    const [estimate] = await db
+      .update(estimates)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(eq(estimates.id, id), eq(estimates.businessId, businessId)))
+      .returning();
+    return estimate;
+  }
+
+  async deleteEstimate(id: string, businessId: string): Promise<boolean> {
+    await db.delete(estimateLineItems).where(eq(estimateLineItems.estimateId, id));
+    const result = await db
+      .delete(estimates)
+      .where(and(eq(estimates.id, id), eq(estimates.businessId, businessId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getEstimateLineItems(estimateId: string): Promise<EstimateLineItem[]> {
+    return db
+      .select()
+      .from(estimateLineItems)
+      .where(eq(estimateLineItems.estimateId, estimateId))
+      .orderBy(estimateLineItems.sortOrder);
+  }
+
+  async addEstimateLineItem(item: InsertEstimateLineItem): Promise<EstimateLineItem> {
+    const [lineItem] = await db.insert(estimateLineItems).values(item as any).returning();
+    return lineItem;
+  }
+
+  async updateEstimateLineItem(id: string, updates: UpdateEstimateLineItem): Promise<EstimateLineItem | undefined> {
+    const [lineItem] = await db
+      .update(estimateLineItems)
+      .set(updates as any)
+      .where(eq(estimateLineItems.id, id))
+      .returning();
+    return lineItem;
+  }
+
+  async deleteEstimateLineItem(id: string): Promise<boolean> {
+    const result = await db.delete(estimateLineItems).where(eq(estimateLineItems.id, id));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async replaceEstimateLineItems(estimateId: string, items: Omit<InsertEstimateLineItem, "estimateId">[]): Promise<EstimateLineItem[]> {
+    await db.delete(estimateLineItems).where(eq(estimateLineItems.estimateId, estimateId));
+    if (items.length === 0) return [];
+    const toInsert = items.map((item, i) => ({ ...item, estimateId, sortOrder: String(i) }));
+    return db.insert(estimateLineItems).values(toInsert as any).returning();
   }
 
   // Property operations

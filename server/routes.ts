@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema } from "@shared/schema";
+import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema } from "@shared/schema";
 import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 
@@ -274,6 +274,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error deleting property:", error);
       res.status(500).json({ error: "Internal server error" });
     }
+  });
+
+  // Pricing Item Routes
+  app.get("/api/pricing-items", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.json([]);
+      res.json(await storage.getPricingItems(business.id));
+    } catch (e) { res.status(500).json({ error: "Internal server error" }); }
+  });
+
+  app.post("/api/pricing-items", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+      const data = insertPricingItemSchema.parse({ ...req.body, businessId: business.id });
+      res.status(201).json(await storage.createPricingItem(data));
+    } catch (e) { res.status(400).json({ error: "Invalid data" }); }
+  });
+
+  app.patch("/api/pricing-items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+      const data = updatePricingItemSchema.parse(req.body);
+      const item = await storage.updatePricingItem(req.params.id, business.id, data);
+      if (!item) return res.status(404).json({ error: "Not found" });
+      res.json(item);
+    } catch (e) { res.status(400).json({ error: "Invalid data" }); }
+  });
+
+  app.delete("/api/pricing-items/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+      const deleted = await storage.deletePricingItem(req.params.id, business.id);
+      if (!deleted) return res.status(404).json({ error: "Not found" });
+      res.status(204).send();
+    } catch (e) { res.status(500).json({ error: "Internal server error" }); }
+  });
+
+  // Estimate Routes
+  app.post("/api/estimates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+      const data = insertEstimateSchema.parse({ ...req.body, businessId: business.id });
+      res.status(201).json(await storage.createEstimate(data));
+    } catch (e) { console.error(e); res.status(400).json({ error: "Invalid data" }); }
+  });
+
+  app.get("/api/estimates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.json([]);
+      res.json(await storage.getEstimates(business.id));
+    } catch (e) { res.status(500).json({ error: "Internal server error" }); }
+  });
+
+  app.get("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+      const estimate = await storage.getEstimate(req.params.id, business.id);
+      if (!estimate) return res.status(404).json({ error: "Not found" });
+      const lineItems = await storage.getEstimateLineItems(estimate.id);
+      res.json({ ...estimate, lineItems });
+    } catch (e) { res.status(500).json({ error: "Internal server error" }); }
+  });
+
+  app.patch("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+      const { lineItems, ...rest } = req.body;
+      const data = (await import("@shared/schema")).updateEstimateSchema.parse(rest);
+      const estimate = await storage.updateEstimate(req.params.id, business.id, data);
+      if (!estimate) return res.status(404).json({ error: "Not found" });
+      if (lineItems !== undefined) {
+        await storage.replaceEstimateLineItems(req.params.id, lineItems);
+      }
+      const updatedLineItems = await storage.getEstimateLineItems(req.params.id);
+      res.json({ ...estimate, lineItems: updatedLineItems });
+    } catch (e) { console.error(e); res.status(400).json({ error: "Invalid data" }); }
+  });
+
+  app.delete("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByOwnerId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+      const deleted = await storage.deleteEstimate(req.params.id, business.id);
+      if (!deleted) return res.status(404).json({ error: "Not found" });
+      res.status(204).send();
+    } catch (e) { res.status(500).json({ error: "Internal server error" }); }
   });
 
   // Work Log Routes (all protected)
