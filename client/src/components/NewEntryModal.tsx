@@ -541,9 +541,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
               {/* 3-Zone Photo Upload */}
               {(() => {
                 const zones = [
-                  { type: "before" as const, label: "Before", icon: "fa-hourglass-start", border: "border-amber-300", bg: "bg-amber-50 dark:bg-amber-950/20", header: "bg-amber-500", pill: "bg-amber-500", desc: "Condition before work" },
-                  { type: "general" as const, label: "Site Photos", icon: "fa-camera", border: "border-blue-300", bg: "bg-blue-50 dark:bg-blue-950/20", header: "bg-blue-500", pill: "bg-blue-500", desc: "Work in progress" },
-                  { type: "after" as const, label: "After", icon: "fa-check-circle", border: "border-green-300", bg: "bg-green-50 dark:bg-green-950/20", header: "bg-green-500", pill: "bg-green-500", desc: "Completed result" },
+                  { type: "before" as const, label: "Before Work", icon: "fa-hourglass-start", border: "border-amber-300", bg: "bg-amber-50 dark:bg-amber-950/20", header: "bg-amber-500", pill: "bg-amber-500", desc: "Site condition on arrival" },
+                  { type: "general" as const, label: "During Work", icon: "fa-camera", border: "border-blue-300", bg: "bg-blue-50 dark:bg-blue-950/20", header: "bg-blue-500", pill: "bg-blue-500", desc: "Work in progress" },
+                  { type: "after" as const, label: "After Complete", icon: "fa-check-circle", border: "border-green-300", bg: "bg-green-50 dark:bg-green-950/20", header: "bg-green-500", pill: "bg-green-500", desc: "Finished result" },
                 ];
                 return (
                   <div className="grid grid-cols-3 gap-3 mb-5">
