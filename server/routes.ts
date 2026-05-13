@@ -49,7 +49,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/business", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       res.json(business || null);
     } catch (error) {
       console.error("Error fetching business:", error);
@@ -61,7 +61,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/business/members", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(404).json({ error: "Business not found" });
       }
@@ -76,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/business/members", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(404).json({ error: "Business not found" });
       }
@@ -138,7 +138,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/vendors", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(400).json({ error: "Business not found" });
       const validatedData = insertVendorSchema.parse({ ...req.body, businessId: business.id });
       const vendor = await storage.createVendor(validatedData);
@@ -152,7 +152,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendors", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.json([]);
       const vendorList = await storage.getVendors(business.id);
       res.json(vendorList);
@@ -165,7 +165,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Vendor not found" });
       const vendor = await storage.getVendor(req.params.id, business.id);
       if (!vendor) return res.status(404).json({ error: "Vendor not found" });
@@ -179,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Vendor not found" });
       const validatedData = updateVendorSchema.parse(req.body);
       const vendor = await storage.updateVendor(req.params.id, business.id, validatedData);
@@ -194,7 +194,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/vendors/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Vendor not found" });
       const deleted = await storage.deleteVendor(req.params.id, business.id);
       if (!deleted) return res.status(404).json({ error: "Vendor not found" });
@@ -209,7 +209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/properties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(400).json({ error: "Business not found" });
       const validatedData = insertPropertySchema.parse({ ...req.body, businessId: business.id });
       const property = await storage.createProperty(validatedData);
@@ -223,7 +223,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/properties", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.json([]);
       const props = await storage.getProperties(business.id);
       res.json(props);
@@ -236,7 +236,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/properties/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Property not found" });
       const property = await storage.getProperty(req.params.id, business.id);
       if (!property) return res.status(404).json({ error: "Property not found" });
@@ -250,7 +250,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/properties/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Property not found" });
       const validatedData = updatePropertySchema.parse(req.body);
       const property = await storage.updateProperty(req.params.id, business.id, validatedData);
@@ -265,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/properties/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Property not found" });
       const deleted = await storage.deleteProperty(req.params.id, business.id);
       if (!deleted) return res.status(404).json({ error: "Property not found" });
@@ -280,7 +280,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/pricing-items", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.json([]);
       res.json(await storage.getPricingItems(business.id));
     } catch (e) { res.status(500).json({ error: "Internal server error" }); }
@@ -289,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/pricing-items", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(400).json({ error: "Business not found" });
       const data = insertPricingItemSchema.parse({ ...req.body, businessId: business.id });
       res.status(201).json(await storage.createPricingItem(data));
@@ -299,7 +299,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/pricing-items/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Not found" });
       const data = updatePricingItemSchema.parse(req.body);
       const item = await storage.updatePricingItem(req.params.id, business.id, data);
@@ -311,7 +311,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/pricing-items/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Not found" });
       const deleted = await storage.deletePricingItem(req.params.id, business.id);
       if (!deleted) return res.status(404).json({ error: "Not found" });
@@ -323,7 +323,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/estimates", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(400).json({ error: "Business not found" });
       const data = insertEstimateSchema.parse({ ...req.body, businessId: business.id });
       res.status(201).json(await storage.createEstimate(data));
@@ -333,7 +333,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/estimates", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.json([]);
       res.json(await storage.getEstimates(business.id));
     } catch (e) { res.status(500).json({ error: "Internal server error" }); }
@@ -342,7 +342,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Not found" });
       const estimate = await storage.getEstimate(req.params.id, business.id);
       if (!estimate) return res.status(404).json({ error: "Not found" });
@@ -354,7 +354,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Not found" });
       const { lineItems, ...rest } = req.body;
       const data = (await import("@shared/schema")).updateEstimateSchema.parse(rest);
@@ -371,7 +371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/estimates/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) return res.status(404).json({ error: "Not found" });
       const deleted = await storage.deleteEstimate(req.params.id, business.id);
       if (!deleted) return res.status(404).json({ error: "Not found" });
@@ -383,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/work-logs", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.json([]);
       }
@@ -410,7 +410,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -429,7 +429,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/work-logs", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(400).json({ error: "Business not found" });
       }
@@ -449,7 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.put("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -469,7 +469,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -489,7 +489,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/work-logs/:id", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.status(404).json({ error: "Work log not found" });
       }
@@ -554,7 +554,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/stats", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
-      const business = await storage.getBusinessByOwnerId(userId);
+      const business = await storage.getBusinessByUserId(userId);
       if (!business) {
         return res.json({
           totalJobs: 0,

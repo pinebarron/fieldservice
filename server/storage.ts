@@ -47,6 +47,7 @@ export interface IStorage {
   createBusiness(business: InsertBusiness): Promise<Business>;
   getBusiness(id: string): Promise<Business | undefined>;
   getBusinessByOwnerId(ownerId: string): Promise<Business | undefined>;
+  getBusinessByUserId(userId: string): Promise<Business | undefined>;
   updateBusiness(id: string, name: string): Promise<Business | undefined>;
   
   // Business member operations
@@ -149,6 +150,19 @@ export class DatabaseStorage implements IStorage {
   async getBusinessByOwnerId(ownerId: string): Promise<Business | undefined> {
     const [business] = await db.select().from(businesses).where(eq(businesses.ownerId, ownerId));
     return business;
+  }
+
+  async getBusinessByUserId(userId: string): Promise<Business | undefined> {
+    // Check owner first
+    const [owned] = await db.select().from(businesses).where(eq(businesses.ownerId, userId));
+    if (owned) return owned;
+    // Fall back to member lookup
+    const [membership] = await db
+      .select({ business: businesses })
+      .from(businessMembers)
+      .innerJoin(businesses, eq(businessMembers.businessId, businesses.id))
+      .where(eq(businessMembers.userId, userId));
+    return membership?.business;
   }
 
   async updateBusiness(id: string, name: string): Promise<Business | undefined> {
