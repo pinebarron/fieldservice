@@ -40,6 +40,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const [photoType, setPhotoType] = useState<"before" | "after" | "general">("general");
   const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [gpsStatus, setGpsStatus] = useState<"idle" | "capturing" | "captured" | "denied">("idle");
+  const [gpsAddress, setGpsAddress] = useState<string | null>(null);
   const [photoMetadata, setPhotoMetadata] = useState<PhotoMeta[]>(editWorkLog?.photoMetadata || []);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
@@ -119,9 +120,16 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
       setPhotoMetadata([]);
       setGpsCoords(null);
       setGpsStatus("idle");
+      setGpsAddress(null);
       setPhotoType("general");
     }
   }, [editWorkLog, isOpen, prefillProperty, form, user]);
+
+  useEffect(() => {
+    if (isOpen && !isEditMode && gpsStatus === "idle") {
+      captureGps(true);
+    }
+  }, [isOpen]);
 
   const saveWorkLogMutation = useMutation({
     mutationFn: async (data: InsertWorkLog) => {
@@ -159,6 +167,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     setPhotoMetadata([]);
     setGpsCoords(null);
     setGpsStatus("idle");
+    setGpsAddress(null);
     setPhotoType("general");
     onClose();
   };
@@ -172,23 +181,57 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     });
   };
 
-  const captureGps = () => {
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+        { headers: { "Accept-Language": "en" } }
+      );
+      const data = await res.json();
+      const addr = data.address || {};
+      const city = addr.city || addr.town || addr.village || addr.hamlet || addr.county || "";
+      const stateAbbr = addr.state
+        ? US_STATES.find((s) =>
+            addr["ISO3166-2-lvl4"]?.endsWith(s) || addr.state_code === s
+          ) || US_STATES.find((s) => addr.state?.toUpperCase().startsWith(s)) || ""
+        : "";
+      const zip = addr.postcode || "";
+      const label = [city, addr.state].filter(Boolean).join(", ");
+      setGpsAddress(label || null);
+      if (city && !form.getValues("city")) form.setValue("city", city);
+      if (stateAbbr && !form.getValues("state")) form.setValue("state", stateAbbr);
+      if (zip && !form.getValues("zipCode")) form.setValue("zipCode", zip);
+      return label;
+    } catch {
+      return null;
+    }
+  };
+
+  const captureGps = (silent = false) => {
     if (!navigator.geolocation) {
-      toast({ title: "GPS not available", description: "Your browser does not support geolocation", variant: "destructive" });
+      if (!silent) toast({ title: "GPS not available", description: "Your browser does not support geolocation", variant: "destructive" });
       return;
     }
     setGpsStatus("capturing");
     navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGpsCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      async (pos) => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        setGpsCoords({ lat, lng });
         setGpsStatus("captured");
-        toast({ title: "Location captured", description: `${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}` });
+        const label = await reverseGeocode(lat, lng);
+        if (!silent) toast({ title: "Location captured", description: label || `${lat.toFixed(5)}, ${lng.toFixed(5)}` });
       },
       () => {
         setGpsStatus("denied");
-        toast({ title: "Location denied", description: "Permission was denied or location unavailable", variant: "destructive" });
+        if (!silent) toast({ title: "Location denied", description: "Permission was denied or location unavailable", variant: "destructive" });
       },
       { enableHighAccuracy: true, timeout: 10000 }
+    );
+  };
+
+  const updateImageType = (index: number, newType: "before" | "after" | "general") => {
+    setPhotoMetadata(prev =>
+      prev.map((m, i) => i === index ? { ...m, type: newType } : m)
     );
   };
 
@@ -484,9 +527,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
               </h4>
 
               {/* Photo Type + GPS Controls */}
-              <div className="flex flex-wrap items-center gap-3 mb-4 p-3 bg-muted/50 rounded-lg border">
-                <div className="flex items-center gap-1">
-                  <span className="text-xs font-medium text-muted-foreground mr-1">Tag as:</span>
+              <div className="mb-4 p-3 bg-muted/50 rounded-lg border space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-semibold text-muted-foreground">Default tag for new uploads:</span>
                   {(["before", "general", "after"] as const).map((t) => {
                     const labels = { before: "Before", general: "General", after: "After" };
                     const icons = { before: "fas fa-hourglass-start", general: "fas fa-camera", after: "fas fa-check-circle" };
@@ -497,7 +540,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                         key={t}
                         type="button"
                         onClick={() => setPhotoType(t)}
-                        className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${photoType === t ? activeColors[t] : colors[t]}`}
+                        className={`text-xs px-3 py-1.5 rounded-full border font-medium transition-colors ${photoType === t ? activeColors[t] : colors[t]}`}
                         data-testid={`photo-type-${t}`}
                       >
                         <i className={`${icons[t]} mr-1`}></i>{labels[t]}
@@ -505,28 +548,42 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-2 ml-auto">
-                  {gpsStatus === "captured" && gpsCoords && (
-                    <span className="text-xs text-green-600 flex items-center gap-1">
-                      <i className="fas fa-map-marker-alt"></i>
-                      {gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)}
-                    </span>
-                  )}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-border/50">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <i className={`fas fa-map-marker-alt text-xs ${gpsStatus === "captured" ? "text-green-600" : gpsStatus === "denied" ? "text-red-500" : "text-muted-foreground"}`}></i>
+                    {gpsStatus === "capturing" && (
+                      <span className="text-xs text-muted-foreground"><i className="fas fa-spinner fa-spin mr-1"></i>Detecting location…</span>
+                    )}
+                    {gpsStatus === "captured" && (
+                      <span className="text-xs text-green-700 truncate">
+                        {gpsAddress || `${gpsCoords?.lat?.toFixed(4)}, ${gpsCoords?.lng?.toFixed(4)}`}
+                        {gpsAddress && gpsCoords && (
+                          <span className="text-green-600/70 ml-1">({gpsCoords.lat.toFixed(4)}, {gpsCoords.lng.toFixed(4)})</span>
+                        )}
+                      </span>
+                    )}
+                    {gpsStatus === "denied" && (
+                      <span className="text-xs text-red-600">Location access denied</span>
+                    )}
+                    {gpsStatus === "idle" && (
+                      <span className="text-xs text-muted-foreground">No location yet</span>
+                    )}
+                  </div>
                   <button
                     type="button"
-                    onClick={captureGps}
+                    onClick={() => captureGps(false)}
                     disabled={gpsStatus === "capturing"}
-                    className={`text-xs px-3 py-1.5 rounded-full border font-medium flex items-center gap-1.5 transition-colors ${
+                    className={`text-xs px-3 py-1.5 rounded-full border font-medium flex items-center gap-1.5 transition-colors flex-shrink-0 ${
                       gpsStatus === "captured"
-                        ? "bg-green-100 text-green-700 border-green-300"
+                        ? "bg-green-100 text-green-700 border-green-300 hover:bg-green-200"
                         : gpsStatus === "denied"
-                        ? "bg-red-100 text-red-700 border-red-300"
+                        ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200"
                         : "bg-card text-foreground border-border hover:bg-muted"
                     }`}
                     data-testid="button-capture-gps"
                   >
-                    <i className={`fas ${gpsStatus === "capturing" ? "fa-spinner fa-spin" : gpsStatus === "captured" ? "fa-map-marker-alt" : "fa-location-arrow"}`}></i>
-                    {gpsStatus === "capturing" ? "Locating..." : gpsStatus === "captured" ? "GPS Ready" : gpsStatus === "denied" ? "GPS Denied" : "Capture GPS"}
+                    <i className={`fas ${gpsStatus === "capturing" ? "fa-spinner fa-spin" : gpsStatus === "captured" ? "fa-redo" : "fa-location-arrow"}`}></i>
+                    {gpsStatus === "capturing" ? "Locating…" : gpsStatus === "captured" ? "Refresh" : "Detect Location"}
                   </button>
                 </div>
               </div>
@@ -550,38 +607,52 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                 </ObjectUploader>
                 
                 {uploadedImages.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4">
-                    {uploadedImages.map((imageUrl, index) => {
-                      const meta = photoMetadata[index];
-                      const typeColors = { before: "bg-amber-500", after: "bg-green-500", general: "bg-blue-500" };
-                      return (
-                        <div key={index} className="relative">
-                          <img
-                            src={imageUrl}
-                            alt={`Uploaded ${index + 1}`}
-                            className="w-full h-24 rounded-lg object-cover"
-                          />
-                          {meta && (
-                            <span className={`absolute bottom-1 left-1 text-white text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${typeColors[meta.type] ?? "bg-gray-500"}`}>
-                              {meta.type}
-                            </span>
-                          )}
-                          {meta?.lat !== undefined && (
-                            <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full">
-                              <i className="fas fa-map-marker-alt"></i>
-                            </span>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => removeImage(index)}
-                            className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs hover:bg-destructive/90"
-                            data-testid={`remove-image-${index}`}
-                          >
-                            ×
-                          </button>
-                        </div>
-                      );
-                    })}
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs text-muted-foreground font-medium">Tap a badge below each photo to change its type:</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {uploadedImages.map((imageUrl, index) => {
+                        const meta = photoMetadata[index];
+                        const currentType = meta?.type ?? "general";
+                        const typeConfig = {
+                          before: { label: "Before", bg: "bg-amber-500 hover:bg-amber-600", icon: "fa-hourglass-start" },
+                          general: { label: "General", bg: "bg-blue-500 hover:bg-blue-600", icon: "fa-camera" },
+                          after: { label: "After", bg: "bg-green-500 hover:bg-green-600", icon: "fa-check-circle" },
+                        } as const;
+                        const nextType = { before: "general", general: "after", after: "before" } as const;
+                        const cfg = typeConfig[currentType];
+                        return (
+                          <div key={index} className="relative group">
+                            <img
+                              src={imageUrl}
+                              alt={`Uploaded ${index + 1}`}
+                              className="w-full h-24 rounded-lg object-cover"
+                            />
+                            {meta?.lat !== undefined && (
+                              <span className="absolute top-1 left-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                                <i className="fas fa-map-marker-alt"></i>
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-destructive-foreground rounded-full flex items-center justify-center text-xs hover:bg-destructive/90 opacity-0 group-hover:opacity-100 transition-opacity"
+                              data-testid={`remove-image-${index}`}
+                            >
+                              ×
+                            </button>
+                            <button
+                              type="button"
+                              title="Click to change photo type"
+                              onClick={() => updateImageType(index, nextType[currentType])}
+                              className={`absolute bottom-1 left-1 right-1 text-white text-[10px] px-1.5 py-0.5 rounded-full font-semibold capitalize flex items-center justify-center gap-1 cursor-pointer transition-colors ${cfg.bg}`}
+                              data-testid={`image-type-badge-${index}`}
+                            >
+                              <i className={`fas ${cfg.icon}`}></i>{cfg.label}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
