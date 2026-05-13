@@ -1,10 +1,10 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { type WorkLog } from "@shared/schema";
+import { type WorkLog, type PhotoMeta } from "@shared/schema";
 
 interface WorkLogCardProps {
   workLog: WorkLog;
   onSelect: (workLog: WorkLog) => void;
-  onOpenLightbox: (images: string[], index: number) => void;
+  onOpenLightbox: (images: string[], index: number, metadata?: PhotoMeta[]) => void;
 }
 
 export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardProps) {
@@ -102,7 +102,7 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
                     className="w-16 h-16 rounded-lg object-cover cursor-pointer hover:scale-105 transition-transform"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onOpenLightbox(workLog.imageUrls!, index);
+                      onOpenLightbox(workLog.imageUrls!, index, workLog.photoMetadata ?? undefined);
                     }}
                     data-testid={`work-log-image-${workLog.id}-${index}`}
                   />

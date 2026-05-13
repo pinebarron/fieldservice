@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type WorkLog } from "@shared/schema";
+import { type WorkLog, type PhotoMeta } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -10,7 +10,7 @@ interface DetailJobModalProps {
   workLog: WorkLog;
   isOpen: boolean;
   onClose: () => void;
-  onOpenLightbox: (images: string[], index: number) => void;
+  onOpenLightbox: (images: string[], index: number, metadata?: PhotoMeta[]) => void;
   onRefresh: () => void;
   onEdit: (workLog: WorkLog) => void;
 }
@@ -160,7 +160,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                   <div
                     key={index}
                     className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform"
-                    onClick={() => onOpenLightbox(workLog.imageUrls!, index)}
+                    onClick={() => onOpenLightbox(workLog.imageUrls!, index, workLog.photoMetadata ?? undefined)}
                     data-testid={`detail-job-image-${index}`}
                   >
                     <img

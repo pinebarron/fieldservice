@@ -30,6 +30,7 @@ export default function PropertyDetail() {
   const [selectedWorkLog, setSelectedWorkLog] = useState<WorkLog | null>(null);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxMetadata, setLightboxMetadata] = useState<import("@shared/schema").PhotoMeta[] | undefined>(undefined);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
   const { data: property, isLoading: propLoading } = useQuery<Property>({
@@ -66,9 +67,10 @@ export default function PropertyDetail() {
     },
   });
 
-  const handleOpenLightbox = (images: string[], index: number) => {
+  const handleOpenLightbox = (images: string[], index: number, metadata?: import("@shared/schema").PhotoMeta[]) => {
     setLightboxImages(images);
     setLightboxIndex(index);
+    setLightboxMetadata(metadata);
     setIsLightboxOpen(true);
   };
 
@@ -338,6 +340,7 @@ export default function PropertyDetail() {
         isOpen={isLightboxOpen}
         onClose={() => setIsLightboxOpen(false)}
         onIndexChange={setLightboxIndex}
+        metadata={lightboxMetadata}
       />
     </div>
   );
