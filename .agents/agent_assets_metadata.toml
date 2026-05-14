@@ -1,0 +1,8 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "9oZGc2sLnI-uBkBCJJLpI"
+uri = "file://API.md"
+type = "text"
+title = "FieldCapture API Reference"
