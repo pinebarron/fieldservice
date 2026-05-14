@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ObjectUploader } from "@/components/ObjectUploader";
-import type { Business } from "@shared/schema";
+import type { Business, ApiClient } from "@shared/schema";
 
 const US_STATES = [
   "AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA",
@@ -402,7 +402,7 @@ export default function Settings() {
         </Card>
 
         {/* Save button (bottom) */}
-        <div className="flex justify-end pb-8">
+        <div className="flex justify-end">
           <Button
             onClick={() => saveMutation.mutate()}
             disabled={saveMutation.isPending || !isOwner}
@@ -416,7 +416,239 @@ export default function Settings() {
             )}
           </Button>
         </div>
+
+        {/* Developer API section — only visible to owner */}
+        {isOwner && <DeveloperApiSection businessId={business?.id} />}
+
       </main>
     </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Developer API section component
+// ────────────────────────────────────────────────────────────
+function DeveloperApiSection({ businessId }: { businessId?: string }) {
+  const { toast } = useToast();
+  const [newClientName, setNewClientName] = useState("");
+  const [revealed, setRevealed] = useState<{ clientId: string; clientSecret: string; name: string } | null>(null);
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const { data: clients = [], isLoading } = useQuery<ApiClient[]>({
+    queryKey: ["/api/developer/clients"],
+    enabled: !!businessId,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (name: string) => {
+      const res = await apiRequest("POST", "/api/developer/clients", { name });
+      return res.json();
+    },
+    onSuccess: (data: ApiClient & { clientSecret: string }) => {
+      setRevealed({ clientId: data.clientId, clientSecret: data.clientSecret, name: data.name });
+      setNewClientName("");
+      queryClient.invalidateQueries({ queryKey: ["/api/developer/clients"] });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not create API client.", variant: "destructive" });
+    },
+  });
+
+  const revokeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest("DELETE", `/api/developer/clients/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/developer/clients"] });
+      toast({ title: "Client revoked", description: "The API client has been disabled." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not revoke client.", variant: "destructive" });
+    },
+  });
+
+  const copy = async (text: string, field: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const activeClients = clients.filter(c => c.isActive === "true");
+  const revokedClients = clients.filter(c => c.isActive !== "true");
+
+  return (
+    <Card className="pb-8" data-testid="developer-api-section">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <i className="fas fa-code text-primary text-sm"></i>
+          Developer API Access
+        </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Generate client credentials so external apps and integrations can access your data via the API.
+          The secret is shown only once — store it securely.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-6">
+
+        {/* How to use */}
+        <div className="rounded-lg bg-muted p-4 space-y-2">
+          <p className="text-xs font-semibold text-foreground uppercase tracking-wide mb-2">How to authenticate</p>
+          <p className="text-xs text-muted-foreground">Add these two headers to every API request:</p>
+          <div className="font-mono text-xs bg-background rounded-md p-3 space-y-1 border border-border">
+            <p><span className="text-primary">X-Client-ID:</span> <span className="text-muted-foreground">fc_id_your_client_id</span></p>
+            <p><span className="text-primary">X-Client-Secret:</span> <span className="text-muted-foreground">fc_secret_your_secret</span></p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            All <span className="font-mono text-foreground">/api/work-logs</span>, <span className="font-mono text-foreground">/api/properties</span>, and other endpoints will then accept these headers.
+          </p>
+        </div>
+
+        {/* Revealed secret — shown immediately after creation */}
+        {revealed && (
+          <div className="rounded-xl border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4 space-y-3">
+            <div className="flex items-start gap-2">
+              <i className="fas fa-exclamation-triangle text-amber-600 mt-0.5"></i>
+              <div>
+                <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                  Copy your secret now — it won't be shown again
+                </p>
+                <p className="text-xs text-amber-700 dark:text-amber-300 mt-0.5">
+                  Client: <strong>{revealed.name}</strong>
+                </p>
+              </div>
+            </div>
+
+            {[
+              { label: "Client ID", value: revealed.clientId, field: "clientId" },
+              { label: "Client Secret", value: revealed.clientSecret, field: "clientSecret" },
+            ].map(({ label, value, field }) => (
+              <div key={field} className="space-y-1">
+                <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{label}</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 bg-background text-foreground text-xs rounded-md px-3 py-2 border border-border font-mono truncate">
+                    {value}
+                  </code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-shrink-0"
+                    onClick={() => copy(value, field)}
+                    data-testid={`copy-${field}`}
+                  >
+                    <i className={`fas ${copiedField === field ? "fa-check text-green-600" : "fa-copy"} mr-1`}></i>
+                    {copiedField === field ? "Copied!" : "Copy"}
+                  </Button>
+                </div>
+              </div>
+            ))}
+
+            <Button
+              size="sm"
+              variant="outline"
+              className="mt-1"
+              onClick={() => setRevealed(null)}
+              data-testid="button-dismiss-secret"
+            >
+              I've saved the credentials — dismiss
+            </Button>
+          </div>
+        )}
+
+        {/* Create new client */}
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-foreground">Create a new API client</p>
+          <div className="flex gap-2">
+            <Input
+              value={newClientName}
+              onChange={e => setNewClientName(e.target.value)}
+              placeholder="e.g. Mobile App, Zapier Integration"
+              className="flex-1"
+              onKeyDown={e => e.key === "Enter" && newClientName.trim() && createMutation.mutate(newClientName)}
+              data-testid="input-new-client-name"
+            />
+            <Button
+              onClick={() => createMutation.mutate(newClientName)}
+              disabled={!newClientName.trim() || createMutation.isPending}
+              data-testid="button-create-client"
+            >
+              {createMutation.isPending
+                ? <><i className="fas fa-spinner fa-spin mr-2"></i>Creating…</>
+                : <><i className="fas fa-plus mr-2"></i>Generate</>}
+            </Button>
+          </div>
+        </div>
+
+        {/* Active clients list */}
+        {isLoading ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <i className="fas fa-spinner fa-spin"></i> Loading clients…
+          </div>
+        ) : activeClients.length > 0 ? (
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Active clients ({activeClients.length})</p>
+            {activeClients.map(c => (
+              <div
+                key={c.id}
+                className="flex items-center gap-3 p-3 rounded-lg border border-border bg-background"
+                data-testid={`api-client-${c.id}`}
+              >
+                <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-key text-primary text-sm"></i>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground">{c.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">{c.clientId}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Created {new Date(c.createdAt!).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+                <span className="text-xs bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                  Active
+                </span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="border-destructive text-destructive hover:bg-destructive/10 flex-shrink-0"
+                  onClick={() => revokeMutation.mutate(c.id)}
+                  disabled={revokeMutation.isPending}
+                  data-testid={`button-revoke-client-${c.id}`}
+                >
+                  <i className="fas fa-ban mr-1"></i>
+                  Revoke
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          !revealed && (
+            <div className="text-center py-6 text-muted-foreground">
+              <i className="fas fa-key text-2xl mb-2 block opacity-30"></i>
+              <p className="text-sm">No API clients yet. Create one above to get started.</p>
+            </div>
+          )
+        )}
+
+        {/* Revoked clients */}
+        {revokedClients.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Revoked</p>
+            {revokedClients.map(c => (
+              <div key={c.id} className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30 opacity-60">
+                <div className="w-8 h-8 bg-muted rounded-lg flex items-center justify-center flex-shrink-0">
+                  <i className="fas fa-key text-muted-foreground text-sm"></i>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground line-through">{c.name}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">{c.clientId}</p>
+                </div>
+                <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full font-medium flex-shrink-0">
+                  Revoked
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }

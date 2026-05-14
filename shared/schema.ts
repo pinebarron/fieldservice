@@ -145,6 +145,17 @@ export const estimateLineItems = pgTable("estimate_line_items", {
   sortOrder: text("sort_order").notNull().default("0"),
 });
 
+// API clients table (developer access)
+export const apiClients = pgTable("api_clients", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  clientId: text("client_id").notNull().unique(),
+  clientSecretHash: text("client_secret_hash").notNull(),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
 // Work logs table
 export const workLogs = pgTable("work_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -262,6 +273,7 @@ export type UpdateEstimate = z.infer<typeof updateEstimateSchema>;
 export type EstimateLineItem = typeof estimateLineItems.$inferSelect;
 export type InsertEstimateLineItem = z.infer<typeof insertEstimateLineItemSchema>;
 export type UpdateEstimateLineItem = z.infer<typeof updateEstimateLineItemSchema>;
+export type ApiClient = typeof apiClients.$inferSelect;
 export type WorkLog = typeof workLogs.$inferSelect;
 export type InsertWorkLog = z.infer<typeof insertWorkLogSchema>;
 export type UpdateWorkLog = z.infer<typeof updateWorkLogSchema>;

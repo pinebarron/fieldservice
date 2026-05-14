@@ -520,6 +520,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Developer API client routes (session auth only — cannot use API keys to manage API keys)
+  app.get("/api/developer/clients", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      if (business.ownerId !== userId) return res.status(403).json({ error: "Only the owner can manage API clients" });
+      const clients = await storage.getApiClients(business.id);
+      res.json(clients.map(c => ({ ...c, clientSecretHash: undefined })));
+    } catch (error) {
+      console.error("Error fetching API clients:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/developer/clients", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      if (business.ownerId !== userId) return res.status(403).json({ error: "Only the owner can create API clients" });
+      const { name } = req.body;
+      if (!name || typeof name !== "string" || name.trim().length === 0) {
+        return res.status(400).json({ error: "Client name is required" });
+      }
+      const result = await storage.createApiClient(business.id, name.trim());
+      res.status(201).json({
+        ...result.record,
+        clientSecretHash: undefined,
+        clientSecret: result.clientSecret,
+      });
+    } catch (error) {
+      console.error("Error creating API client:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.delete("/api/developer/clients/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      if (business.ownerId !== userId) return res.status(403).json({ error: "Only the owner can revoke API clients" });
+      const revoked = await storage.revokeApiClient(req.params.id, business.id);
+      if (!revoked) return res.status(404).json({ error: "Client not found" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error revoking API client:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Check-in route
   app.post("/api/work-logs/:id/check-in", isAuthenticated, async (req: any, res) => {
     try {

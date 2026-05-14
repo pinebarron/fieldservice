@@ -128,6 +128,27 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // --- API key authentication (X-Client-ID + X-Client-Secret headers) ---
+  const clientId = req.headers["x-client-id"] as string | undefined;
+  const clientSecret = req.headers["x-client-secret"] as string | undefined;
+
+  if (clientId && clientSecret) {
+    try {
+      const apiClient = await storage.verifyApiClient(clientId, clientSecret);
+      if (apiClient) {
+        const business = await storage.getBusiness(apiClient.businessId);
+        if (business) {
+          (req as any).user = { claims: { sub: business.ownerId }, expires_at: Infinity };
+          return next();
+        }
+      }
+    } catch {
+      // fall through to session auth
+    }
+    return res.status(401).json({ message: "Invalid API credentials" });
+  }
+
+  // --- Session authentication (browser / cookie) ---
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {

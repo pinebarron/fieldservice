@@ -8,6 +8,7 @@ import {
   estimates,
   estimateLineItems,
   workLogs,
+  apiClients,
   type User,
   type UpsertUser,
   type Business,
@@ -33,7 +34,9 @@ import {
   type WorkLog,
   type InsertWorkLog,
   type UpdateWorkLog,
+  type ApiClient,
 } from "@shared/schema";
+import crypto from "crypto";
 import { db } from "./db";
 import { eq, and, desc, sql, ilike } from "drizzle-orm";
 
@@ -89,6 +92,13 @@ export interface IStorage {
   updateProperty(id: string, businessId: string, updates: UpdateProperty): Promise<Property | undefined>;
   deleteProperty(id: string, businessId: string): Promise<boolean>;
   
+  // API client operations
+  createApiClient(businessId: string, name: string): Promise<{ clientId: string; clientSecret: string; record: ApiClient }>;
+  getApiClients(businessId: string): Promise<ApiClient[]>;
+  getApiClientByClientId(clientId: string): Promise<ApiClient | undefined>;
+  revokeApiClient(id: string, businessId: string): Promise<boolean>;
+  verifyApiClient(clientId: string, clientSecret: string): Promise<ApiClient | undefined>;
+
   // Work log operations
   getWorkLogs(businessId: string): Promise<(WorkLog & { technician: User })[]>;
   getWorkLog(id: string, businessId: string): Promise<WorkLog | undefined>;
@@ -447,6 +457,40 @@ export class DatabaseStorage implements IStorage {
       .from(workLogs)
       .where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId)));
     return log;
+  }
+
+  async createApiClient(businessId: string, name: string): Promise<{ clientId: string; clientSecret: string; record: ApiClient }> {
+    const clientId = `fc_id_${crypto.randomBytes(12).toString("hex")}`;
+    const clientSecret = `fc_secret_${crypto.randomBytes(24).toString("hex")}`;
+    const clientSecretHash = crypto.createHash("sha256").update(clientSecret).digest("hex");
+    const [record] = await db.insert(apiClients).values({ businessId, name, clientId, clientSecretHash }).returning();
+    return { clientId, clientSecret, record };
+  }
+
+  async getApiClients(businessId: string): Promise<ApiClient[]> {
+    return db.select().from(apiClients).where(eq(apiClients.businessId, businessId)).orderBy(desc(apiClients.createdAt));
+  }
+
+  async getApiClientByClientId(clientId: string): Promise<ApiClient | undefined> {
+    const [record] = await db.select().from(apiClients).where(eq(apiClients.clientId, clientId));
+    return record;
+  }
+
+  async revokeApiClient(id: string, businessId: string): Promise<boolean> {
+    const [updated] = await db
+      .update(apiClients)
+      .set({ isActive: "false" })
+      .where(and(eq(apiClients.id, id), eq(apiClients.businessId, businessId)))
+      .returning();
+    return !!updated;
+  }
+
+  async verifyApiClient(clientId: string, clientSecret: string): Promise<ApiClient | undefined> {
+    const record = await this.getApiClientByClientId(clientId);
+    if (!record || record.isActive !== "true") return undefined;
+    const hash = crypto.createHash("sha256").update(clientSecret).digest("hex");
+    if (hash !== record.clientSecretHash) return undefined;
+    return record;
   }
 
   async createWorkLog(workLogData: InsertWorkLog): Promise<WorkLog> {
