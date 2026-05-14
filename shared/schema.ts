@@ -167,6 +167,12 @@ export const workLogs = pgTable("work_logs", {
   imageUrls: json("image_urls").$type<string[]>().default([]),
   pdfUrls: json("pdf_urls").$type<string[]>().default([]),
   photoMetadata: json("photo_metadata").$type<PhotoMeta[]>().default([]),
+  checkInTime: text("check_in_time"),
+  checkOutTime: text("check_out_time"),
+  checkInLat: text("check_in_lat"),
+  checkInLng: text("check_in_lng"),
+  checkOutLat: text("check_out_lat"),
+  checkOutLng: text("check_out_lng"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

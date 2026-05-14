@@ -520,6 +520,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Check-in route
+  app.post("/api/work-logs/:id/check-in", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const { lat, lng } = req.body;
+      const updates: any = { checkInTime: new Date().toISOString() };
+      if (lat != null) updates.checkInLat = String(lat);
+      if (lng != null) updates.checkInLng = String(lng);
+      const workLog = await storage.updateWorkLog(req.params.id, business.id, updates);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+      res.json(workLog);
+    } catch (error) {
+      console.error("Error checking in:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Check-out route
+  app.post("/api/work-logs/:id/check-out", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+      const { lat, lng } = req.body;
+      const updates: any = { checkOutTime: new Date().toISOString() };
+      if (lat != null) updates.checkOutLat = String(lat);
+      if (lng != null) updates.checkOutLng = String(lng);
+      const workLog = await storage.updateWorkLog(req.params.id, business.id, updates);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+      res.json(workLog);
+    } catch (error) {
+      console.error("Error checking out:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
   // Object Storage Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {

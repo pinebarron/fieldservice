@@ -18,10 +18,30 @@ interface DetailJobModalProps {
   onEdit: (workLog: WorkLog) => void;
 }
 
+function calcDuration(checkIn: string, checkOut: string): string {
+  const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+  if (ms <= 0) return "0 min";
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  if (hrs === 0) return `${mins} min`;
+  if (mins === 0) return `${hrs}h`;
+  return `${hrs}h ${mins}m`;
+}
+
+function formatCheckTime(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', hour12: true,
+  });
+}
+
 export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRefresh, onEdit }: DetailJobModalProps) {
   const { toast } = useToast();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
+  const [localWorkLog, setLocalWorkLog] = useState<WorkLog>(workLog);
+
+  const wl = localWorkLog;
 
   const { data: business } = useQuery<{ name: string }>({
     queryKey: ["/api/business"],
@@ -33,13 +53,13 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
     enabled: isOpen,
   });
 
-  const allTechnicianIds: string[] = (workLog as any).technicianUserIds?.length
-    ? (workLog as any).technicianUserIds
-    : [workLog.technicianUserId];
+  const allTechnicianIds: string[] = (wl as any).technicianUserIds?.length
+    ? (wl as any).technicianUserIds
+    : [wl.technicianUserId];
 
   const resolveTechName = (userId: string) => {
-    if (userId === workLog.technicianUserId) {
-      const t = (workLog as any).technician;
+    if (userId === wl.technicianUserId) {
+      const t = (wl as any).technician;
       if (t) return `${t.firstName ?? ""} ${t.lastName ?? ""}`.trim();
     }
     const m = members.find(m => m.userId === userId);
@@ -50,13 +70,13 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
     setGeneratingPdf(true);
     try {
       const blob = await pdf(
-        <WorkReportPDF workLog={workLog} businessName={business?.name} />
+        <WorkReportPDF workLog={wl} businessName={business?.name} />
       ).toBlob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      const safeName = workLog.customerName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
-      link.download = `work_report_${safeName}_${workLog.serviceDate}.pdf`;
+      const safeName = wl.customerName.replace(/[^a-z0-9]/gi, "_").toLowerCase();
+      link.download = `work_report_${safeName}_${wl.serviceDate}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -75,62 +95,102 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
       await apiRequest("DELETE", `/api/work-logs/${id}`);
     },
     onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Work log entry deleted successfully",
-      });
+      toast({ title: "Success", description: "Work log entry deleted successfully" });
       queryClient.invalidateQueries({ queryKey: ['/api/work-logs'] });
       queryClient.invalidateQueries({ queryKey: ['/api/stats'] });
       onRefresh();
       onClose();
     },
     onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to delete work log entry",
-        variant: "destructive",
+      toast({ title: "Error", description: "Failed to delete work log entry", variant: "destructive" });
+    },
+  });
+
+  const checkInMutation = useMutation({
+    mutationFn: async () => {
+      return new Promise<WorkLog>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const data = await apiRequest("POST", `/api/work-logs/${wl.id}/check-in`, {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+            resolve(await data.json());
+          },
+          async () => {
+            const data = await apiRequest("POST", `/api/work-logs/${wl.id}/check-in`, {});
+            resolve(await data.json());
+          },
+          { timeout: 8000 }
+        );
       });
+    },
+    onSuccess: (updated: WorkLog) => {
+      setLocalWorkLog(updated);
+      queryClient.invalidateQueries({ queryKey: ['/api/work-logs'] });
+      toast({ title: "Checked in!", description: "Your arrival has been recorded." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to check in.", variant: "destructive" });
+    },
+  });
+
+  const checkOutMutation = useMutation({
+    mutationFn: async () => {
+      return new Promise<WorkLog>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          async (pos) => {
+            const data = await apiRequest("POST", `/api/work-logs/${wl.id}/check-out`, {
+              lat: pos.coords.latitude,
+              lng: pos.coords.longitude,
+            });
+            resolve(await data.json());
+          },
+          async () => {
+            const data = await apiRequest("POST", `/api/work-logs/${wl.id}/check-out`, {});
+            resolve(await data.json());
+          },
+          { timeout: 8000 }
+        );
+      });
+    },
+    onSuccess: (updated: WorkLog) => {
+      setLocalWorkLog(updated);
+      queryClient.invalidateQueries({ queryKey: ['/api/work-logs'] });
+      toast({ title: "Checked out!", description: "Your departure has been recorded." });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to check out.", variant: "destructive" });
     },
   });
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const formatTimestamp = (timestamp: Date | null) => {
     if (!timestamp) return 'N/A';
     return new Date(timestamp).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit', hour12: true,
     });
   };
 
   const getDuration = () => {
-    if (workLog.startTime && workLog.endTime) {
-      return `${workLog.startTime} - ${workLog.endTime}`;
-    }
+    if (wl.startTime && wl.endTime) return `${wl.startTime} - ${wl.endTime}`;
     return 'Not specified';
   };
 
   const handleDelete = () => {
     if (showDeleteConfirm) {
-      deleteWorkLogMutation.mutate(workLog.id);
+      deleteWorkLogMutation.mutate(wl.id);
     } else {
       setShowDeleteConfirm(true);
     }
   };
 
   const handleDownloadPdf = (pdfUrl: string, index: number) => {
-    // Create a temporary link element to trigger download
     const link = document.createElement('a');
     link.href = pdfUrl;
     link.download = `report_${index + 1}.pdf`;
@@ -139,16 +199,25 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
     document.body.removeChild(link);
   };
 
+  const isCheckedIn = !!(wl as any).checkInTime;
+  const isCheckedOut = !!(wl as any).checkOutTime;
+  const checkInTime: string | undefined = (wl as any).checkInTime;
+  const checkOutTime: string | undefined = (wl as any).checkOutTime;
+  const checkInLat: string | undefined = (wl as any).checkInLat;
+  const checkInLng: string | undefined = (wl as any).checkInLng;
+  const checkOutLat: string | undefined = (wl as any).checkOutLat;
+  const checkOutLng: string | undefined = (wl as any).checkOutLng;
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex flex-col gap-2">
-            <span data-testid="detail-job-title">{workLog.customerName}</span>
+            <span data-testid="detail-job-title">{wl.customerName}</span>
             <div className="flex flex-wrap gap-3 text-sm font-normal">
               <span className="text-muted-foreground">
                 <i className="fas fa-calendar mr-1"></i>
-                {formatDate(workLog.serviceDate)}
+                {formatDate(wl.serviceDate)}
               </span>
               <span className="text-muted-foreground" data-testid="detail-technicians">
                 <i className={`fas ${allTechnicianIds.length > 1 ? "fa-users" : "fa-user"} mr-1`}></i>
@@ -165,8 +234,20 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
               </span>
               <span className="status-badge px-3 py-1 bg-accent/10 text-accent rounded-full text-xs font-medium">
                 <i className="fas fa-check-circle mr-1"></i>
-                {workLog.status === 'completed' ? 'Completed' : workLog.status}
+                {wl.status === 'completed' ? 'Completed' : wl.status}
               </span>
+              {isCheckedIn && !isCheckedOut && (
+                <span className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 rounded-full text-xs font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block"></span>
+                  On Site
+                </span>
+              )}
+              {isCheckedIn && isCheckedOut && (
+                <span className="px-3 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 rounded-full text-xs font-medium">
+                  <i className="fas fa-clock mr-1"></i>
+                  {calcDuration(checkInTime!, checkOutTime!)} on site
+                </span>
+              )}
             </div>
           </DialogTitle>
         </DialogHeader>
@@ -177,15 +258,15 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Location</h4>
               <p className="text-foreground mb-3" data-testid="detail-job-location">
-                {workLog.locationName}<br />
-                {workLog.city}, {workLog.state} {workLog.zipCode}
+                {wl.locationName}<br />
+                {wl.city}, {wl.state} {wl.zipCode}
               </p>
-              <JobMap workLogs={[workLog]} height="200px" singleJob />
+              <JobMap workLogs={[wl]} height="200px" singleJob />
             </div>
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Work Type</h4>
               <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm font-medium" data-testid="detail-job-work-type">
-                {workLog.workType}
+                {wl.workType}
               </span>
             </div>
             <div>
@@ -195,8 +276,107 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Status</h4>
               <p className="text-foreground" data-testid="detail-job-status">
-                {workLog.status === 'completed' ? 'Work Completed Successfully' : workLog.status}
+                {wl.status === 'completed' ? 'Work Completed Successfully' : wl.status}
               </p>
+            </div>
+          </div>
+
+          {/* Check-in / Check-out */}
+          <div>
+            <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              <i className="fas fa-map-pin mr-2"></i>
+              Check-in / Check-out
+            </h4>
+            <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-4">
+              {!isCheckedIn ? (
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-foreground">Not checked in yet</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Tap to record your arrival with GPS location</p>
+                  </div>
+                  <Button
+                    className="bg-green-600 hover:bg-green-700 text-white gap-2 flex-shrink-0"
+                    onClick={() => checkInMutation.mutate()}
+                    disabled={checkInMutation.isPending}
+                    data-testid="button-check-in"
+                  >
+                    {checkInMutation.isPending
+                      ? <><i className="fas fa-spinner fa-spin"></i> Checking in…</>
+                      : <><i className="fas fa-sign-in-alt"></i> Check In</>}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  {/* Check-in row */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 bg-green-100 dark:bg-green-900/40 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <i className="fas fa-sign-in-alt text-green-600 text-sm"></i>
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-foreground">Checked in</p>
+                      <p className="text-xs text-muted-foreground">{formatCheckTime(checkInTime!)}</p>
+                      {checkInLat && checkInLng && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          <i className="fas fa-crosshairs mr-1"></i>
+                          {Number(checkInLat).toFixed(5)}, {Number(checkInLng).toFixed(5)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {!isCheckedOut ? (
+                    <>
+                      {/* Live timer placeholder + check-out button */}
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 pl-12">
+                        <div className="flex-1">
+                          <p className="text-sm text-muted-foreground">Currently on site</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          className="border-blue-400 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-2 flex-shrink-0"
+                          onClick={() => checkOutMutation.mutate()}
+                          disabled={checkOutMutation.isPending}
+                          data-testid="button-check-out"
+                        >
+                          {checkOutMutation.isPending
+                            ? <><i className="fas fa-spinner fa-spin"></i> Checking out…</>
+                            : <><i className="fas fa-sign-out-alt"></i> Check Out</>}
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Check-out row */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-9 h-9 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                          <i className="fas fa-sign-out-alt text-blue-600 text-sm"></i>
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-foreground">Checked out</p>
+                          <p className="text-xs text-muted-foreground">{formatCheckTime(checkOutTime!)}</p>
+                          {checkOutLat && checkOutLng && (
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              <i className="fas fa-crosshairs mr-1"></i>
+                              {Number(checkOutLat).toFixed(5)}, {Number(checkOutLng).toFixed(5)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Duration summary */}
+                      <div className="ml-12 bg-background rounded-lg border border-border p-3 flex items-center gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                          <i className="fas fa-clock text-primary text-sm"></i>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Total time on site</p>
+                          <p className="text-lg font-bold text-foreground">{calcDuration(checkInTime!, checkOutTime!)}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
           </div>
 
@@ -205,15 +385,15 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Work Performed</h4>
             <div className="bg-muted rounded-lg p-4">
               <p className="text-foreground leading-relaxed whitespace-pre-wrap" data-testid="detail-job-work-performed">
-                {workLog.workPerformed}
+                {wl.workPerformed}
               </p>
             </div>
           </div>
 
           {/* Images Gallery — grouped by Before / During / After */}
-          {workLog.imageUrls && workLog.imageUrls.length > 0 && (() => {
-            const meta: PhotoMeta[] = workLog.photoMetadata || [];
-            const allPhotos = workLog.imageUrls.map((url, i) => ({
+          {wl.imageUrls && wl.imageUrls.length > 0 && (() => {
+            const meta: PhotoMeta[] = wl.photoMetadata || [];
+            const allPhotos = wl.imageUrls.map((url, i) => ({
               url,
               type: meta[i]?.type ?? "general",
               originalIndex: i,
@@ -230,7 +410,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             return (
               <div>
                 <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                  Photos ({workLog.imageUrls.length})
+                  Photos ({wl.imageUrls.length})
                 </h4>
 
                 {hasCategories ? (
@@ -253,7 +433,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                                 <div
                                   key={p.originalIndex}
                                   className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform shadow-sm"
-                                  onClick={() => onOpenLightbox(workLog.imageUrls!, p.originalIndex, workLog.photoMetadata ?? undefined)}
+                                  onClick={() => onOpenLightbox(wl.imageUrls!, p.originalIndex, wl.photoMetadata ?? undefined)}
                                   data-testid={`detail-job-image-${p.originalIndex}`}
                                 >
                                   <img
@@ -275,7 +455,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                       <div
                         key={p.originalIndex}
                         className="aspect-square rounded-lg overflow-hidden cursor-pointer hover:scale-105 transition-transform"
-                        onClick={() => onOpenLightbox(workLog.imageUrls!, p.originalIndex, workLog.photoMetadata ?? undefined)}
+                        onClick={() => onOpenLightbox(wl.imageUrls!, p.originalIndex, wl.photoMetadata ?? undefined)}
                         data-testid={`detail-job-image-${p.originalIndex}`}
                       >
                         <img
@@ -292,13 +472,13 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
           })()}
 
           {/* PDF Reports */}
-          {workLog.pdfUrls && workLog.pdfUrls.length > 0 && (
+          {wl.pdfUrls && wl.pdfUrls.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Reports & Documents ({workLog.pdfUrls.length})
+                Reports & Documents ({wl.pdfUrls.length})
               </h4>
               <div className="space-y-2">
-                {workLog.pdfUrls.map((url, index) => (
+                {wl.pdfUrls.map((url, index) => (
                   <div
                     key={index}
                     className="flex items-center gap-3 p-3 bg-muted rounded-lg hover:bg-muted/80 transition-colors cursor-pointer"
@@ -313,10 +493,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                       <p className="text-xs text-muted-foreground">PDF Document</p>
                     </div>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownloadPdf(url, index);
-                      }}
+                      onClick={(e) => { e.stopPropagation(); handleDownloadPdf(url, index); }}
                       className="text-primary hover:text-primary/80 transition-colors"
                       data-testid={`download-pdf-${index}`}
                     >
@@ -329,12 +506,12 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
           )}
 
           {/* Additional Notes */}
-          {workLog.additionalNotes && (
+          {wl.additionalNotes && (
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Additional Notes</h4>
               <div className="bg-muted rounded-lg p-4">
                 <p className="text-foreground leading-relaxed whitespace-pre-wrap" data-testid="detail-job-additional-notes">
-                  {workLog.additionalNotes}
+                  {wl.additionalNotes}
                 </p>
               </div>
             </div>
@@ -345,22 +522,18 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
               <span data-testid="detail-job-created-at">
                 <i className="fas fa-clock mr-1"></i>
-                Created: {formatTimestamp(workLog.createdAt)}
+                Created: {formatTimestamp(wl.createdAt)}
               </span>
               <span data-testid="detail-job-updated-at">
                 <i className="fas fa-edit mr-1"></i>
-                Last Updated: {formatTimestamp(workLog.updatedAt)}
+                Last Updated: {formatTimestamp(wl.updatedAt)}
               </span>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
-            <Button 
-              className="flex-1" 
-              onClick={() => onEdit(workLog)}
-              data-testid="button-edit-entry"
-            >
+            <Button className="flex-1" onClick={() => onEdit(wl)} data-testid="button-edit-entry">
               <i className="fas fa-edit mr-2"></i>
               Edit Entry
             </Button>
@@ -371,11 +544,9 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
               disabled={generatingPdf}
               data-testid="button-generate-report"
             >
-              {generatingPdf ? (
-                <><i className="fas fa-spinner fa-spin mr-2"></i>Generating…</>
-              ) : (
-                <><i className="fas fa-file-pdf mr-2"></i>Download Report</>
-              )}
+              {generatingPdf
+                ? <><i className="fas fa-spinner fa-spin mr-2"></i>Generating…</>
+                : <><i className="fas fa-file-pdf mr-2"></i>Download Report</>}
             </Button>
             <Button
               variant={showDeleteConfirm ? "destructive" : "outline"}
@@ -385,20 +556,11 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
               data-testid="button-delete-entry"
             >
               {deleteWorkLogMutation.isPending ? (
-                <>
-                  <i className="fas fa-spinner fa-spin mr-2"></i>
-                  Deleting...
-                </>
+                <><i className="fas fa-spinner fa-spin mr-2"></i>Deleting...</>
               ) : showDeleteConfirm ? (
-                <>
-                  <i className="fas fa-exclamation-triangle mr-2"></i>
-                  Confirm Delete
-                </>
+                <><i className="fas fa-exclamation-triangle mr-2"></i>Confirm Delete</>
               ) : (
-                <>
-                  <i className="fas fa-trash mr-2"></i>
-                  Delete
-                </>
+                <><i className="fas fa-trash mr-2"></i>Delete</>
               )}
             </Button>
           </div>

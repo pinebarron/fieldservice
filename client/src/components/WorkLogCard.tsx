@@ -7,6 +7,16 @@ interface WorkLogCardProps {
   onOpenLightbox: (images: string[], index: number, metadata?: PhotoMeta[]) => void;
 }
 
+function calcDuration(checkIn: string, checkOut: string): string {
+  const ms = new Date(checkOut).getTime() - new Date(checkIn).getTime();
+  if (ms <= 0) return "0 min";
+  const hrs = Math.floor(ms / 3600000);
+  const mins = Math.floor((ms % 3600000) / 60000);
+  if (hrs === 0) return `${mins}m`;
+  if (mins === 0) return `${hrs}h`;
+  return `${hrs}h ${mins}m`;
+}
+
 export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardProps) {
   const getWorkTypeIcon = (workType: string) => {
     const type = workType.toLowerCase();
@@ -41,6 +51,12 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
 
   const ids: string[] = (workLog as any).technicianUserIds ?? [];
   const extra = ids.length > 1 ? ids.length - 1 : 0;
+
+  const isCheckedIn = !!(workLog as any).checkInTime && !(workLog as any).checkOutTime;
+  const isCheckedOut = !!(workLog as any).checkInTime && !!(workLog as any).checkOutTime;
+  const duration = isCheckedOut
+    ? calcDuration((workLog as any).checkInTime, (workLog as any).checkOutTime)
+    : null;
 
   return (
     <Card
@@ -117,7 +133,7 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
               </p>
             )}
 
-            {/* Status + work type badges */}
+            {/* Status + work type + check-in badges */}
             <div className="flex flex-wrap gap-2 mt-3">
               <span className="px-2.5 py-1 bg-accent/10 text-accent rounded-full text-xs font-medium">
                 <i className="fas fa-check-circle mr-1"></i>
@@ -126,6 +142,18 @@ export function WorkLogCard({ workLog, onSelect, onOpenLightbox }: WorkLogCardPr
               <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getWorkTypeColor(workLog.workType)}`}>
                 {workLog.workType}
               </span>
+              {isCheckedIn && (
+                <span className="px-2.5 py-1 bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 rounded-full text-xs font-medium flex items-center gap-1" data-testid={`work-log-checkin-${workLog.id}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block"></span>
+                  On Site
+                </span>
+              )}
+              {isCheckedOut && duration && (
+                <span className="px-2.5 py-1 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 rounded-full text-xs font-medium" data-testid={`work-log-duration-badge-${workLog.id}`}>
+                  <i className="fas fa-clock mr-1"></i>
+                  {duration} on site
+                </span>
+              )}
             </div>
           </div>
 
