@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link } from "wouter";
 import { AppHeader } from "@/components/AppHeader";
 import { useQuery } from "@tanstack/react-query";
@@ -29,7 +29,9 @@ export default function Dashboard() {
   const [lightboxMetadata, setLightboxMetadata] = useState<import("@shared/schema").PhotoMeta[] | undefined>(undefined);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState("all");
-  const [showMap, setShowMap] = useState(false);
+  const [showMap, setShowMap] = useState(true);
+  const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const { user } = useAuth();
 
   const { data: workLogs = [], isLoading: logsLoading, refetch: refetchLogs } = useQuery<WorkLog[]>({
@@ -41,14 +43,19 @@ export default function Dashboard() {
   });
 
   const filters = [
-    { key: "all", label: "All Jobs" },
-    { key: "solar", label: "Solar Installation" },
-    { key: "maintenance", label: "Maintenance" },
-    { key: "inspection", label: "Inspection" },
-    { key: "repair", label: "Repair" },
+    { key: "all", label: "All Jobs", icon: "fa-list" },
+    { key: "mine", label: "My Jobs", icon: "fa-user" },
+    { key: "solar", label: "Solar", icon: "fa-solar-panel" },
+    { key: "maintenance", label: "Maintenance", icon: "fa-wrench" },
+    { key: "inspection", label: "Inspection", icon: "fa-clipboard-check" },
+    { key: "repair", label: "Repair", icon: "fa-tools" },
   ];
 
   const filteredWorkLogs = workLogs.filter(log => {
+    if (activeFilter === "mine") {
+      const ids: string[] = (log as any).technicianUserIds ?? [];
+      return ids.includes(user?.id ?? "") || log.technicianUserId === user?.id;
+    }
     if (activeFilter === "all") return true;
     return log.workType.toLowerCase().includes(activeFilter);
   });
@@ -75,6 +82,15 @@ export default function Dashboard() {
     setEditWorkLog(null);
   };
 
+  const handlePinClick = (wl: WorkLog) => {
+    setHighlightedId(wl.id);
+    const el = cardRefs.current[wl.id];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    setTimeout(() => setHighlightedId(null), 2500);
+  };
+
   if (logsLoading || statsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -90,166 +106,182 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <AppHeader />
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Dashboard Header */}
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <div>
-              <h2 className="text-2xl font-bold text-foreground">Work Log Dashboard</h2>
-              <p className="text-muted-foreground mt-1">Track and manage field service entries</p>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                variant={showMap ? "default" : "outline"}
-                className="flex items-center gap-2"
-                onClick={() => setShowMap(v => !v)}
-                data-testid="toggle-map-button"
-              >
-                <i className="fas fa-map-marked-alt"></i>
-                <span className="hidden sm:inline">{showMap ? "Hide Map" : "Map View"}</span>
-              </Button>
-              <Button variant="outline" className="flex items-center gap-2" data-testid="export-button">
-                <i className="fas fa-download"></i>
-                <span className="hidden sm:inline">Export</span>
-              </Button>
-            </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-5">
+          <div>
+            <h2 className="text-2xl font-bold text-foreground">Work History</h2>
+            <p className="text-muted-foreground text-sm mt-0.5">
+              {workLogs.length} total job{workLogs.length !== 1 ? "s" : ""} across {new Set(workLogs.map(w => `${w.city},${w.state}`)).size} location{new Set(workLogs.map(w => `${w.city},${w.state}`)).size !== 1 ? "s" : ""}
+            </p>
           </div>
-
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Total Jobs</p>
-                    <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-total-jobs">
-                      {stats?.totalJobs || 0}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <i className="fas fa-briefcase text-primary text-xl"></i>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">This Week</p>
-                    <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-week-jobs">
-                      {stats?.weekJobs || 0}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-accent/10 rounded-lg flex items-center justify-center">
-                    <i className="fas fa-calendar-week text-accent text-xl"></i>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Images Uploaded</p>
-                    <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-images">
-                      {stats?.images || 0}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-secondary/10 rounded-lg flex items-center justify-center">
-                    <i className="fas fa-image text-secondary text-xl"></i>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-sm">Reports</p>
-                    <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-reports">
-                      {stats?.reports || 0}
-                    </p>
-                  </div>
-                  <div className="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center">
-                    <i className="fas fa-file-pdf text-destructive text-xl"></i>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Map View */}
-          {showMap && workLogs.length > 0 && (
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                  <i className="fas fa-map-marker-alt mr-1.5"></i>
-                  Job Locations ({workLogs.length})
-                </h3>
-                <p className="text-xs text-muted-foreground">Click a pin to see job details</p>
-              </div>
-              <JobMap
-                workLogs={workLogs}
-                height="420px"
-                onPinClick={(wl) => setSelectedWorkLog(wl)}
-              />
-            </div>
-          )}
-
-          {/* Filters */}
-          <div className="flex gap-2 overflow-x-auto pb-2">
-            {filters.map((filter) => (
-              <button
-                key={filter.key}
-                onClick={() => setActiveFilter(filter.key)}
-                className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                  activeFilter === filter.key
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground hover:bg-muted/80"
-                }`}
-                data-testid={`filter-${filter.key}`}
-              >
-                {filter.label}
-              </button>
-            ))}
+          <div className="flex gap-2">
+            <Button
+              variant={showMap ? "default" : "outline"}
+              size="sm"
+              className="gap-2"
+              onClick={() => setShowMap(v => !v)}
+              data-testid="toggle-map-button"
+            >
+              <i className="fas fa-map-marked-alt"></i>
+              <span className="hidden sm:inline">{showMap ? "Hide Map" : "Show Map"}</span>
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" data-testid="export-button">
+              <i className="fas fa-download"></i>
+              <span className="hidden sm:inline">Export</span>
+            </Button>
           </div>
         </div>
 
-        {/* Work Log Entries */}
-        <div className="space-y-4">
-          {filteredWorkLogs.length === 0 ? (
-            <Card>
-              <CardContent className="p-8 text-center">
-                <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-4">
-                  <i className="fas fa-clipboard-list text-2xl text-muted-foreground"></i>
+        {/* Stats row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Jobs</p>
+                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-total-jobs">
+                    {stats?.totalJobs || 0}
+                  </p>
                 </div>
-                <h3 className="text-lg font-semibold text-foreground mb-2">No work logs found</h3>
-                <p className="text-muted-foreground mb-4">
-                  {activeFilter === "all" 
-                    ? "Start by creating your first work log entry."
-                    : "No entries match the selected filter. Try a different filter or create a new entry."
-                  }
-                </p>
-                <Button onClick={() => setIsNewEntryModalOpen(true)} data-testid="create-first-entry-button">
-                  Create First Entry
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            filteredWorkLogs.map((workLog) => (
-              <WorkLogCard
-                key={workLog.id}
-                workLog={workLog}
-                onSelect={handleWorkLogSelect}
-                onOpenLightbox={handleOpenLightbox}
-              />
-            ))
+                <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <i className="fas fa-briefcase text-primary text-lg"></i>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">This Week</p>
+                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-week-jobs">
+                    {stats?.weekJobs || 0}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center">
+                  <i className="fas fa-calendar-week text-accent text-lg"></i>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Photos</p>
+                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-images">
+                    {stats?.images || 0}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-secondary/10 rounded-lg flex items-center justify-center">
+                  <i className="fas fa-image text-secondary text-lg"></i>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Reports</p>
+                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-reports">
+                    {stats?.reports || 0}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-destructive/10 rounded-lg flex items-center justify-center">
+                  <i className="fas fa-file-pdf text-destructive text-lg"></i>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filter chips */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-5 scrollbar-none">
+          {filters.map((filter) => (
+            <button
+              key={filter.key}
+              onClick={() => setActiveFilter(filter.key)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
+                activeFilter === filter.key
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+              }`}
+              data-testid={`filter-${filter.key}`}
+            >
+              <i className={`fas ${filter.icon} text-xs`}></i>
+              {filter.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Split layout: map + job list */}
+        <div className={showMap && workLogs.length > 0 ? "flex flex-col lg:flex-row gap-5" : ""}>
+
+          {/* Map panel */}
+          {showMap && workLogs.length > 0 && (
+            <div className="lg:w-[400px] xl:w-[460px] flex-shrink-0">
+              <div className="lg:sticky lg:top-20">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <i className="fas fa-map-marker-alt mr-1.5 text-primary"></i>
+                    {filteredWorkLogs.length} location{filteredWorkLogs.length !== 1 ? "s" : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Tap a pin to highlight job</p>
+                </div>
+                <JobMap
+                  workLogs={filteredWorkLogs}
+                  height="480px"
+                  onPinClick={handlePinClick}
+                />
+              </div>
+            </div>
           )}
+
+          {/* Job list */}
+          <div className="flex-1 min-w-0">
+            {filteredWorkLogs.length === 0 ? (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-4">
+                    <i className="fas fa-clipboard-list text-2xl text-muted-foreground"></i>
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">No work logs found</h3>
+                  <p className="text-muted-foreground mb-4">
+                    {activeFilter === "all"
+                      ? "Start by creating your first work log entry."
+                      : activeFilter === "mine"
+                      ? "No jobs assigned to you yet."
+                      : "No entries match the selected filter."}
+                  </p>
+                  <Button onClick={() => setIsNewEntryModalOpen(true)} data-testid="create-first-entry-button">
+                    Create First Entry
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {filteredWorkLogs.map((workLog) => (
+                  <div
+                    key={workLog.id}
+                    ref={el => { cardRefs.current[workLog.id] = el; }}
+                    className={`transition-all duration-300 rounded-xl ${
+                      highlightedId === workLog.id
+                        ? "ring-2 ring-primary ring-offset-2 shadow-lg scale-[1.01]"
+                        : ""
+                    }`}
+                  >
+                    <WorkLogCard
+                      workLog={workLog}
+                      onSelect={handleWorkLogSelect}
+                      onOpenLightbox={handleOpenLightbox}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
 
