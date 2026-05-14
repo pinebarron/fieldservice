@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "wouter";
+import { AppHeader } from "@/components/AppHeader";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -249,63 +250,7 @@ export default function Properties() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b border-border sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <Link href="/">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center cursor-pointer">
-                  <i className="fas fa-clipboard-list text-primary-foreground text-xl"></i>
-                </div>
-              </Link>
-              <div>
-                <h1 className="text-xl font-bold text-foreground">FieldCapture</h1>
-                <p className="text-xs text-muted-foreground hidden sm:block">Property Containers</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link href="/">
-                <Button variant="ghost" size="sm" data-testid="nav-dashboard">
-                  <i className="fas fa-table-list mr-2"></i>
-                  <span className="hidden sm:inline">Work Logs</span>
-                </Button>
-              </Link>
-              <Link href="/estimates">
-                <Button variant="ghost" size="sm" data-testid="estimates-link">
-                  <i className="fas fa-file-invoice-dollar mr-2"></i>
-                  <span className="hidden sm:inline">Estimates</span>
-                </Button>
-              </Link>
-              <Link href="/team">
-                <Button variant="ghost" size="sm" data-testid="team-link">
-                  <i className="fas fa-users mr-2"></i>
-                  <span className="hidden sm:inline">Team</span>
-                </Button>
-              </Link>
-              <Link href="/vendors">
-                <Button variant="ghost" size="sm" data-testid="vendors-link">
-                  <i className="fas fa-handshake mr-2"></i>
-                  <span className="hidden sm:inline">Vendors</span>
-                </Button>
-              </Link>
-              <Button variant="ghost" size="sm" onClick={() => window.location.href = "/api/logout"} data-testid="logout-button">
-                <i className="fas fa-sign-out-alt mr-2"></i>
-                <span className="hidden sm:inline">Logout</span>
-              </Button>
-              <div className="flex items-center gap-2">
-                {user?.profileImageUrl ? (
-                  <img src={user.profileImageUrl} alt="" className="w-9 h-9 rounded-full object-cover" />
-                ) : (
-                  <div className="w-9 h-9 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                    {user?.firstName?.[0]}{user?.lastName?.[0]}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <AppHeader />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">

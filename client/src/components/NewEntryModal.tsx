@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -44,6 +44,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const [propertyPickerOpen, setPropertyPickerOpen] = useState(false);
   const [linkedProperty, setLinkedProperty] = useState<Property | null>(prefillProperty ?? null);
   const [selectedTechnicianIds, setSelectedTechnicianIds] = useState<string[]>([]);
+  const cameraZoneRef = useRef<PhotoMeta["type"]>("general");
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [cameraUploading, setCameraUploading] = useState(false);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
@@ -300,6 +303,38 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         }
       }
     };
+
+  const openCamera = (type: PhotoMeta["type"]) => {
+    cameraZoneRef.current = type;
+    cameraInputRef.current?.click();
+  };
+
+  const handleCameraFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setCameraUploading(true);
+    try {
+      const uploadRes = await apiRequest("POST", "/api/objects/upload", {});
+      const { uploadURL } = await uploadRes.json();
+      await fetch(uploadURL, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      const finalizeRes = await apiRequest("PUT", "/api/objects/finalize", { objectUrl: uploadURL });
+      const { objectPath } = await finalizeRes.json();
+      setPhotos(prev => [...prev, {
+        url: objectPath,
+        type: cameraZoneRef.current,
+        ...(gpsCoords ? { lat: gpsCoords.lat, lng: gpsCoords.lng, address: gpsAddress || undefined } : {}),
+        capturedAt: new Date().toISOString(),
+        technicianName: user ? `${user.firstName || ""} ${user.lastName || ""}`.trim() || undefined : undefined,
+      }]);
+      toast({ title: "Photo added" });
+    } catch (error) {
+      console.error("Camera upload error:", error);
+      toast({ title: "Upload failed", description: "Could not upload photo", variant: "destructive" });
+    } finally {
+      setCameraUploading(false);
+    }
+  };
 
   const handlePdfUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
     for (const file of result.successful) {
@@ -712,7 +747,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                   { type: "after" as const, label: "After Complete", icon: "fa-check-circle", border: "border-green-300", bg: "bg-green-50 dark:bg-green-950/20", header: "bg-green-500", pill: "bg-green-500", desc: "Finished result" },
                 ];
                 return (
-                  <div className="grid grid-cols-3 gap-3 mb-5">
+                  <div className="grid grid-cols-1 gap-4 mb-5 sm:grid-cols-3 sm:gap-3">
                     {zones.map(({ type, label, icon, border, bg, header, pill, desc }) => {
                       const zonePhotos = photos
                         .map((p, i) => ({ ...p, globalIndex: i }))
@@ -770,6 +805,19 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                               </div>
                             )}
                             {/* Upload button for this zone */}
+                            {/* Camera capture — mobile-first */}
+                            <button
+                              type="button"
+                              onClick={() => openCamera(type)}
+                              disabled={cameraUploading}
+                              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border-2 border-dashed border-current/40 text-xs font-semibold transition-colors bg-white/60 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 active:scale-95"
+                              style={{ color: header.replace("bg-", "").includes("amber") ? "#d97706" : header.replace("bg-", "").includes("blue") ? "#2563eb" : "#16a34a" }}
+                              data-testid={`button-camera-${type}`}
+                            >
+                              <i className={`fas ${cameraUploading && cameraZoneRef.current === type ? "fa-spinner fa-spin" : "fa-camera"}`}></i>
+                              <span className="sm:hidden">Take Photo</span>
+                              <span className="hidden sm:inline">{zonePhotos.length === 0 ? "Camera" : "+"}</span>
+                            </button>
                             <ObjectUploader
                               maxNumberOfFiles={10}
                               maxFileSize={10485760}
@@ -778,8 +826,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                               buttonClassName="w-full"
                             >
                               <div className="flex items-center justify-center gap-1.5 py-1.5 text-xs font-medium">
-                                <i className="fas fa-plus text-[10px]"></i>
-                                {zonePhotos.length === 0 ? `Add ${label}` : "Add more"}
+                                <i className="fas fa-upload text-[10px]"></i>
+                                <span className="sm:hidden">Upload from Gallery</span>
+                                <span className="hidden sm:inline">{zonePhotos.length === 0 ? `Add ${label}` : "Add more"}</span>
                               </div>
                             </ObjectUploader>
                             {zonePhotos.length === 0 && (
@@ -792,6 +841,17 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                   </div>
                 );
               })()}
+
+              {/* Hidden camera input for native mobile camera */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={handleCameraFile}
+                data-testid="input-camera-capture"
+              />
 
               {/* PDF Upload */}
               <div>
