@@ -1076,6 +1076,15 @@ function getSupabase2() {
 }
 async function setupAuth(app2) {
   app2.set("trust proxy", 1);
+  app2.get("/api/auth/debug", (req, res) => {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    res.json({
+      url: supabaseUrl || "NOT SET",
+      anonKeySource: process.env.SUPABASE_ANON_KEY ? "SUPABASE_ANON_KEY" : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "NEXT_PUBLIC_SUPABASE_ANON_KEY" : "NONE",
+      anonKeyPrefix: anonKey ? anonKey.substring(0, 30) + "..." : "NOT SET"
+    });
+  });
   app2.get("/api/login", (req, res) => {
     const redirectTo = `${req.protocol}://${req.get("host")}/api/auth/callback`;
     const supabaseUrl = process.env.SUPABASE_URL;
