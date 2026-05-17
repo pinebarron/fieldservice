@@ -1,9 +1,8 @@
 module.exports = (req, res) => {
-  res.json({
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify({
     working: true,
-    env: {
-      hasSupabaseUrl: !!process.env.SUPABASE_URL,
-      hasDatabaseUrl: !!process.env.DATABASE_URL,
-    }
-  });
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasDatabaseUrl: !!process.env.DATABASE_URL
+  }));
 };
