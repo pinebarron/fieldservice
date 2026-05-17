@@ -1,5 +1,6 @@
 import express from 'express';
 import cookieParser from 'cookie-parser';
+import { registerRoutes } from './routes';
 
 const app = express();
 
@@ -11,24 +12,14 @@ app.use(express.urlencoded({ extended: false }));
 // Lazy initialization for serverless
 let initialized = false;
 let initPromise: Promise<void> | null = null;
-let initError: Error | null = null;
 
 async function initializeApp() {
-  if (initError) throw initError;
   if (initialized) return;
   if (initPromise) return initPromise;
 
   initPromise = (async () => {
-    try {
-      // Dynamic import to avoid top-level errors
-      const { registerRoutes } = await import('./routes.js');
-      await registerRoutes(app);
-      initialized = true;
-    } catch (err) {
-      initError = err as Error;
-      console.error('Failed to initialize app:', err);
-      throw err;
-    }
+    await registerRoutes(app);
+    initialized = true;
   })();
 
   return initPromise;

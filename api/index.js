@@ -910,307 +910,6 @@ var init_storage = __esm({
   }
 });
 
-// server/supabaseStorage.ts
-var import_supabase_js, import_crypto2, supabase, BUCKET_NAME, ObjectNotFoundError, ObjectStorageService, objectStorageService;
-var init_supabaseStorage = __esm({
-  "server/supabaseStorage.ts"() {
-    "use strict";
-    import_supabase_js = require("@supabase/supabase-js");
-    import_crypto2 = require("crypto");
-    supabase = (0, import_supabase_js.createClient)(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-    BUCKET_NAME = "field-uploads";
-    ObjectNotFoundError = class extends Error {
-      constructor() {
-        super("Object not found");
-        this.name = "ObjectNotFoundError";
-      }
-    };
-    ObjectStorageService = class {
-      /**
-       * Get a signed upload URL for direct browser-to-storage uploads
-       * Returns a URL that accepts PUT requests with the file content
-       */
-      async getObjectEntityUploadURL() {
-        const objectId = (0, import_crypto2.randomUUID)();
-        const filePath = `uploads/${objectId}`;
-        const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUploadUrl(filePath);
-        if (error) {
-          console.error("Failed to create upload URL:", error);
-          throw new Error(`Failed to create upload URL: ${error.message}`);
-        }
-        return data.signedUrl;
-      }
-      /**
-       * Get file from storage by path
-       */
-      async getObjectEntityFile(objectPath) {
-        const normalizedPath = objectPath.replace(/^\/objects\//, "").replace(/^objects\//, "");
-        const { data, error } = await supabase.storage.from(BUCKET_NAME).download(normalizedPath);
-        if (error) {
-          console.error("Failed to download file:", error);
-          return null;
-        }
-        return {
-          data,
-          contentType: data.type || "application/octet-stream"
-        };
-      }
-      /**
-       * Download file and stream to HTTP response
-       */
-      async downloadObject(objectPath, res) {
-        const file = await this.getObjectEntityFile(objectPath);
-        if (!file) {
-          throw new ObjectNotFoundError();
-        }
-        const buffer = Buffer.from(await file.data.arrayBuffer());
-        res.set({
-          "Content-Type": file.contentType,
-          "Content-Length": buffer.length.toString(),
-          "Cache-Control": "public, max-age=3600"
-        });
-        res.send(buffer);
-      }
-      /**
-       * Get public URL for an object (if bucket is public)
-       */
-      getPublicUrl(objectPath) {
-        const normalizedPath = objectPath.replace(/^\/objects\//, "").replace(/^objects\//, "");
-        const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(normalizedPath);
-        return data.publicUrl;
-      }
-      /**
-       * Normalize an object path from various formats to a consistent /objects/... format
-       * Handles:
-       * - Full Supabase storage URLs
-       * - Signed URLs
-       * - Already-normalized paths
-       */
-      normalizeObjectEntityPath(rawPath) {
-        if (rawPath.startsWith("/objects/")) {
-          return rawPath;
-        }
-        const supabaseUrl = process.env.SUPABASE_URL;
-        if (rawPath.includes(supabaseUrl) || rawPath.includes("supabase.co/storage")) {
-          try {
-            const url = new URL(rawPath);
-            const pathParts = url.pathname.split("/storage/v1/object/");
-            if (pathParts.length > 1) {
-              const afterObject = pathParts[1];
-              const parts = afterObject.split("/");
-              if (parts.length >= 3) {
-                const objectPath = parts.slice(2).join("/");
-                return `/objects/${objectPath}`;
-              }
-            }
-            const bucketIndex = url.pathname.indexOf(BUCKET_NAME);
-            if (bucketIndex !== -1) {
-              const pathAfterBucket = url.pathname.substring(bucketIndex + BUCKET_NAME.length + 1);
-              return `/objects/${pathAfterBucket}`;
-            }
-          } catch {
-          }
-        }
-        if (!rawPath.startsWith("/")) {
-          return `/objects/${rawPath}`;
-        }
-        return rawPath;
-      }
-      /**
-       * Delete an object from storage
-       */
-      async deleteObject(objectPath) {
-        const normalizedPath = objectPath.replace(/^\/objects\//, "").replace(/^objects\//, "");
-        const { error } = await supabase.storage.from(BUCKET_NAME).remove([normalizedPath]);
-        if (error) {
-          console.error("Failed to delete object:", error);
-          return false;
-        }
-        return true;
-      }
-    };
-    objectStorageService = new ObjectStorageService();
-  }
-});
-
-// server/supabaseAuth.ts
-async function setupAuth(app2) {
-  app2.set("trust proxy", 1);
-  app2.get("/api/login", (req, res) => {
-    const redirectTo = `${req.protocol}://${req.get("host")}/api/auth/callback`;
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
-    res.redirect(authUrl);
-  });
-  app2.post("/api/auth/login", async (req, res) => {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
-    const { data, error } = await supabase2.auth.signInWithPassword({
-      email,
-      password
-    });
-    if (error || !data.session) {
-      return res.status(401).json({ message: error?.message || "Login failed" });
-    }
-    await storage.upsertUser({
-      id: data.session.user.id,
-      email: data.session.user.email ?? null,
-      firstName: data.session.user.user_metadata?.first_name ?? null,
-      lastName: data.session.user.user_metadata?.last_name ?? null,
-      profileImageUrl: data.session.user.user_metadata?.avatar_url ?? null
-    });
-    setAuthCookies(res, data.session.access_token, data.session.refresh_token);
-    res.json({ user: data.session.user });
-  });
-  app2.post("/api/auth/signup", async (req, res) => {
-    const { email, password, firstName, lastName } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: "Email and password required" });
-    }
-    const { data, error } = await supabase2.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          first_name: firstName,
-          last_name: lastName
-        }
-      }
-    });
-    if (error) {
-      return res.status(400).json({ message: error.message });
-    }
-    if (data.session) {
-      await storage.upsertUser({
-        id: data.session.user.id,
-        email: data.session.user.email ?? null,
-        firstName: firstName ?? null,
-        lastName: lastName ?? null,
-        profileImageUrl: null
-      });
-      setAuthCookies(res, data.session.access_token, data.session.refresh_token);
-      res.json({ user: data.session.user });
-    } else {
-      res.json({ message: "Check your email for confirmation link" });
-    }
-  });
-  app2.get("/api/auth/callback", async (req, res) => {
-    const code = req.query.code;
-    if (!code) {
-      return res.redirect("/?error=no_code");
-    }
-    try {
-      const { data, error } = await supabase2.auth.exchangeCodeForSession(code);
-      if (error || !data.session) {
-        console.error("Auth callback error:", error);
-        return res.redirect("/?error=auth_failed");
-      }
-      const user = data.session.user;
-      await storage.upsertUser({
-        id: user.id,
-        email: user.email ?? null,
-        firstName: user.user_metadata?.full_name?.split(" ")[0] ?? user.user_metadata?.first_name ?? null,
-        lastName: user.user_metadata?.full_name?.split(" ").slice(1).join(" ") ?? user.user_metadata?.last_name ?? null,
-        profileImageUrl: user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null
-      });
-      setAuthCookies(res, data.session.access_token, data.session.refresh_token);
-      res.redirect("/");
-    } catch (err) {
-      console.error("Auth callback exception:", err);
-      res.redirect("/?error=auth_exception");
-    }
-  });
-  app2.get("/api/logout", (req, res) => {
-    res.clearCookie("sb-access-token");
-    res.clearCookie("sb-refresh-token");
-    res.redirect("/");
-  });
-  app2.post("/api/auth/logout", (req, res) => {
-    res.clearCookie("sb-access-token");
-    res.clearCookie("sb-refresh-token");
-    res.json({ success: true });
-  });
-}
-function setAuthCookies(res, accessToken, refreshToken) {
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 7 * 24 * 60 * 60 * 1e3,
-    // 1 week
-    path: "/"
-  };
-  res.cookie("sb-access-token", accessToken, cookieOptions);
-  res.cookie("sb-refresh-token", refreshToken, cookieOptions);
-}
-var import_supabase_js2, supabase2, isAuthenticated;
-var init_supabaseAuth = __esm({
-  "server/supabaseAuth.ts"() {
-    "use strict";
-    import_supabase_js2 = require("@supabase/supabase-js");
-    init_storage();
-    if (!process.env.SUPABASE_URL) {
-      throw new Error("SUPABASE_URL environment variable is not set");
-    }
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-      throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is not set");
-    }
-    supabase2 = (0, import_supabase_js2.createClient)(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
-    isAuthenticated = async (req, res, next) => {
-      const clientId = req.headers["x-client-id"];
-      const clientSecret = req.headers["x-client-secret"];
-      if (clientId && clientSecret) {
-        try {
-          const apiClient = await storage.verifyApiClient(clientId, clientSecret);
-          if (apiClient) {
-            const business = await storage.getBusiness(apiClient.businessId);
-            if (business) {
-              req.user = { claims: { sub: business.ownerId } };
-              return next();
-            }
-          }
-        } catch {
-        }
-        return res.status(401).json({ message: "Invalid API credentials" });
-      }
-      const accessToken = req.cookies?.["sb-access-token"];
-      const refreshToken = req.cookies?.["sb-refresh-token"];
-      if (!accessToken) {
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-      try {
-        const { data: { user }, error } = await supabase2.auth.getUser(accessToken);
-        if (error || !user) {
-          if (refreshToken) {
-            const { data: refreshData, error: refreshError } = await supabase2.auth.refreshSession({
-              refresh_token: refreshToken
-            });
-            if (!refreshError && refreshData.session) {
-              setAuthCookies(res, refreshData.session.access_token, refreshData.session.refresh_token);
-              req.user = { claims: { sub: refreshData.session.user.id } };
-              return next();
-            }
-          }
-          return res.status(401).json({ message: "Unauthorized" });
-        }
-        req.user = { claims: { sub: user.id } };
-        return next();
-      } catch (err) {
-        console.error("Auth middleware error:", err);
-        return res.status(401).json({ message: "Unauthorized" });
-      }
-    };
-  }
-});
-
 // server/recurringJobService.ts
 var recurringJobService_exports = {};
 __export(recurringJobService_exports, {
@@ -1710,11 +1409,310 @@ var init_googleCalendarService = __esm({
   }
 });
 
-// server/routes.ts
-var routes_exports = {};
-__export(routes_exports, {
-  registerRoutes: () => registerRoutes
+// server/vercel-handler.ts
+var vercel_handler_exports = {};
+__export(vercel_handler_exports, {
+  default: () => handler
 });
+module.exports = __toCommonJS(vercel_handler_exports);
+var import_express = __toESM(require("express"), 1);
+var import_cookie_parser = __toESM(require("cookie-parser"), 1);
+
+// server/routes.ts
+var import_http = require("http");
+init_storage();
+init_schema();
+
+// server/supabaseStorage.ts
+var import_supabase_js = require("@supabase/supabase-js");
+var import_crypto2 = require("crypto");
+var supabase = (0, import_supabase_js.createClient)(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+var BUCKET_NAME = "field-uploads";
+var ObjectNotFoundError = class extends Error {
+  constructor() {
+    super("Object not found");
+    this.name = "ObjectNotFoundError";
+  }
+};
+var ObjectStorageService = class {
+  /**
+   * Get a signed upload URL for direct browser-to-storage uploads
+   * Returns a URL that accepts PUT requests with the file content
+   */
+  async getObjectEntityUploadURL() {
+    const objectId = (0, import_crypto2.randomUUID)();
+    const filePath = `uploads/${objectId}`;
+    const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUploadUrl(filePath);
+    if (error) {
+      console.error("Failed to create upload URL:", error);
+      throw new Error(`Failed to create upload URL: ${error.message}`);
+    }
+    return data.signedUrl;
+  }
+  /**
+   * Get file from storage by path
+   */
+  async getObjectEntityFile(objectPath) {
+    const normalizedPath = objectPath.replace(/^\/objects\//, "").replace(/^objects\//, "");
+    const { data, error } = await supabase.storage.from(BUCKET_NAME).download(normalizedPath);
+    if (error) {
+      console.error("Failed to download file:", error);
+      return null;
+    }
+    return {
+      data,
+      contentType: data.type || "application/octet-stream"
+    };
+  }
+  /**
+   * Download file and stream to HTTP response
+   */
+  async downloadObject(objectPath, res) {
+    const file = await this.getObjectEntityFile(objectPath);
+    if (!file) {
+      throw new ObjectNotFoundError();
+    }
+    const buffer = Buffer.from(await file.data.arrayBuffer());
+    res.set({
+      "Content-Type": file.contentType,
+      "Content-Length": buffer.length.toString(),
+      "Cache-Control": "public, max-age=3600"
+    });
+    res.send(buffer);
+  }
+  /**
+   * Get public URL for an object (if bucket is public)
+   */
+  getPublicUrl(objectPath) {
+    const normalizedPath = objectPath.replace(/^\/objects\//, "").replace(/^objects\//, "");
+    const { data } = supabase.storage.from(BUCKET_NAME).getPublicUrl(normalizedPath);
+    return data.publicUrl;
+  }
+  /**
+   * Normalize an object path from various formats to a consistent /objects/... format
+   * Handles:
+   * - Full Supabase storage URLs
+   * - Signed URLs
+   * - Already-normalized paths
+   */
+  normalizeObjectEntityPath(rawPath) {
+    if (rawPath.startsWith("/objects/")) {
+      return rawPath;
+    }
+    const supabaseUrl = process.env.SUPABASE_URL;
+    if (rawPath.includes(supabaseUrl) || rawPath.includes("supabase.co/storage")) {
+      try {
+        const url = new URL(rawPath);
+        const pathParts = url.pathname.split("/storage/v1/object/");
+        if (pathParts.length > 1) {
+          const afterObject = pathParts[1];
+          const parts = afterObject.split("/");
+          if (parts.length >= 3) {
+            const objectPath = parts.slice(2).join("/");
+            return `/objects/${objectPath}`;
+          }
+        }
+        const bucketIndex = url.pathname.indexOf(BUCKET_NAME);
+        if (bucketIndex !== -1) {
+          const pathAfterBucket = url.pathname.substring(bucketIndex + BUCKET_NAME.length + 1);
+          return `/objects/${pathAfterBucket}`;
+        }
+      } catch {
+      }
+    }
+    if (!rawPath.startsWith("/")) {
+      return `/objects/${rawPath}`;
+    }
+    return rawPath;
+  }
+  /**
+   * Delete an object from storage
+   */
+  async deleteObject(objectPath) {
+    const normalizedPath = objectPath.replace(/^\/objects\//, "").replace(/^objects\//, "");
+    const { error } = await supabase.storage.from(BUCKET_NAME).remove([normalizedPath]);
+    if (error) {
+      console.error("Failed to delete object:", error);
+      return false;
+    }
+    return true;
+  }
+};
+var objectStorageService = new ObjectStorageService();
+
+// server/supabaseAuth.ts
+var import_supabase_js2 = require("@supabase/supabase-js");
+init_storage();
+if (!process.env.SUPABASE_URL) {
+  throw new Error("SUPABASE_URL environment variable is not set");
+}
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is not set");
+}
+var supabase2 = (0, import_supabase_js2.createClient)(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+async function setupAuth(app2) {
+  app2.set("trust proxy", 1);
+  app2.get("/api/login", (req, res) => {
+    const redirectTo = `${req.protocol}://${req.get("host")}/api/auth/callback`;
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+    res.redirect(authUrl);
+  });
+  app2.post("/api/auth/login", async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+    const { data, error } = await supabase2.auth.signInWithPassword({
+      email,
+      password
+    });
+    if (error || !data.session) {
+      return res.status(401).json({ message: error?.message || "Login failed" });
+    }
+    await storage.upsertUser({
+      id: data.session.user.id,
+      email: data.session.user.email ?? null,
+      firstName: data.session.user.user_metadata?.first_name ?? null,
+      lastName: data.session.user.user_metadata?.last_name ?? null,
+      profileImageUrl: data.session.user.user_metadata?.avatar_url ?? null
+    });
+    setAuthCookies(res, data.session.access_token, data.session.refresh_token);
+    res.json({ user: data.session.user });
+  });
+  app2.post("/api/auth/signup", async (req, res) => {
+    const { email, password, firstName, lastName } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+    const { data, error } = await supabase2.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          first_name: firstName,
+          last_name: lastName
+        }
+      }
+    });
+    if (error) {
+      return res.status(400).json({ message: error.message });
+    }
+    if (data.session) {
+      await storage.upsertUser({
+        id: data.session.user.id,
+        email: data.session.user.email ?? null,
+        firstName: firstName ?? null,
+        lastName: lastName ?? null,
+        profileImageUrl: null
+      });
+      setAuthCookies(res, data.session.access_token, data.session.refresh_token);
+      res.json({ user: data.session.user });
+    } else {
+      res.json({ message: "Check your email for confirmation link" });
+    }
+  });
+  app2.get("/api/auth/callback", async (req, res) => {
+    const code = req.query.code;
+    if (!code) {
+      return res.redirect("/?error=no_code");
+    }
+    try {
+      const { data, error } = await supabase2.auth.exchangeCodeForSession(code);
+      if (error || !data.session) {
+        console.error("Auth callback error:", error);
+        return res.redirect("/?error=auth_failed");
+      }
+      const user = data.session.user;
+      await storage.upsertUser({
+        id: user.id,
+        email: user.email ?? null,
+        firstName: user.user_metadata?.full_name?.split(" ")[0] ?? user.user_metadata?.first_name ?? null,
+        lastName: user.user_metadata?.full_name?.split(" ").slice(1).join(" ") ?? user.user_metadata?.last_name ?? null,
+        profileImageUrl: user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null
+      });
+      setAuthCookies(res, data.session.access_token, data.session.refresh_token);
+      res.redirect("/");
+    } catch (err) {
+      console.error("Auth callback exception:", err);
+      res.redirect("/?error=auth_exception");
+    }
+  });
+  app2.get("/api/logout", (req, res) => {
+    res.clearCookie("sb-access-token");
+    res.clearCookie("sb-refresh-token");
+    res.redirect("/");
+  });
+  app2.post("/api/auth/logout", (req, res) => {
+    res.clearCookie("sb-access-token");
+    res.clearCookie("sb-refresh-token");
+    res.json({ success: true });
+  });
+}
+function setAuthCookies(res, accessToken, refreshToken) {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 7 * 24 * 60 * 60 * 1e3,
+    // 1 week
+    path: "/"
+  };
+  res.cookie("sb-access-token", accessToken, cookieOptions);
+  res.cookie("sb-refresh-token", refreshToken, cookieOptions);
+}
+var isAuthenticated = async (req, res, next) => {
+  const clientId = req.headers["x-client-id"];
+  const clientSecret = req.headers["x-client-secret"];
+  if (clientId && clientSecret) {
+    try {
+      const apiClient = await storage.verifyApiClient(clientId, clientSecret);
+      if (apiClient) {
+        const business = await storage.getBusiness(apiClient.businessId);
+        if (business) {
+          req.user = { claims: { sub: business.ownerId } };
+          return next();
+        }
+      }
+    } catch {
+    }
+    return res.status(401).json({ message: "Invalid API credentials" });
+  }
+  const accessToken = req.cookies?.["sb-access-token"];
+  const refreshToken = req.cookies?.["sb-refresh-token"];
+  if (!accessToken) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+  try {
+    const { data: { user }, error } = await supabase2.auth.getUser(accessToken);
+    if (error || !user) {
+      if (refreshToken) {
+        const { data: refreshData, error: refreshError } = await supabase2.auth.refreshSession({
+          refresh_token: refreshToken
+        });
+        if (!refreshError && refreshData.session) {
+          setAuthCookies(res, refreshData.session.access_token, refreshData.session.refresh_token);
+          req.user = { claims: { sub: refreshData.session.user.id } };
+          return next();
+        }
+      }
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    req.user = { claims: { sub: user.id } };
+    return next();
+  } catch (err) {
+    console.error("Auth middleware error:", err);
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+};
+
+// server/routes.ts
 async function registerRoutes(app2) {
   await setupAuth(app2);
   app2.get("/api/auth/user", isAuthenticated, async (req, res) => {
@@ -2884,47 +2882,20 @@ async function registerRoutes(app2) {
   const httpServer = (0, import_http.createServer)(app2);
   return httpServer;
 }
-var import_http;
-var init_routes = __esm({
-  "server/routes.ts"() {
-    "use strict";
-    import_http = require("http");
-    init_storage();
-    init_schema();
-    init_supabaseStorage();
-    init_supabaseAuth();
-  }
-});
 
 // server/vercel-handler.ts
-var vercel_handler_exports = {};
-__export(vercel_handler_exports, {
-  default: () => handler
-});
-module.exports = __toCommonJS(vercel_handler_exports);
-var import_express = __toESM(require("express"), 1);
-var import_cookie_parser = __toESM(require("cookie-parser"), 1);
 var app = (0, import_express.default)();
 app.use((0, import_cookie_parser.default)());
 app.use(import_express.default.json());
 app.use(import_express.default.urlencoded({ extended: false }));
 var initialized = false;
 var initPromise = null;
-var initError = null;
 async function initializeApp() {
-  if (initError) throw initError;
   if (initialized) return;
   if (initPromise) return initPromise;
   initPromise = (async () => {
-    try {
-      const { registerRoutes: registerRoutes2 } = await Promise.resolve().then(() => (init_routes(), routes_exports));
-      await registerRoutes2(app);
-      initialized = true;
-    } catch (err) {
-      initError = err;
-      console.error("Failed to initialize app:", err);
-      throw err;
-    }
+    await registerRoutes(app);
+    initialized = true;
   })();
   return initPromise;
 }
