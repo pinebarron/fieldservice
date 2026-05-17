@@ -393,7 +393,7 @@ export function DynamicFormReadOnly({
   schema: FormSchema;
   values: Record<string, unknown>;
 }) {
-  const renderValue = (field: FormFieldDefinition, value: unknown) => {
+  const renderValue = (field: FormFieldDefinition, value: unknown): React.ReactNode => {
     if (value === undefined || value === null || value === "") {
       return <span className="text-muted-foreground italic">Not provided</span>;
     }
@@ -408,10 +408,10 @@ export function DynamicFormReadOnly({
         return selectedLabels || "None";
       case "select":
       case "radio":
-        return field.options?.find((o) => o.value === value)?.label || value;
+        return field.options?.find((o) => o.value === value)?.label || String(value);
       case "gps":
         const coords = value as { lat: number; lng: number };
-        return `${coords.lat.toFixed(5)}, ${coords.lng.toFixed(5)}`;
+        return `${coords.lat?.toFixed(5) ?? '?'}, ${coords.lng?.toFixed(5) ?? '?'}`;
       default:
         return String(value);
     }

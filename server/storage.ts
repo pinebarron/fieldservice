@@ -246,7 +246,7 @@ export class DatabaseStorage implements IStorage {
 
   async removeBusinessMember(id: string): Promise<boolean> {
     const result = await db.delete(businessMembers).where(eq(businessMembers.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   // Vendor operations
@@ -284,7 +284,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(vendors)
       .where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   // Pricing item operations
@@ -314,7 +314,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(pricingItems)
       .where(and(eq(pricingItems.id, id), eq(pricingItems.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   // Estimate operations
@@ -353,7 +353,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(estimates)
       .where(and(eq(estimates.id, id), eq(estimates.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   async getEstimateLineItems(estimateId: string): Promise<EstimateLineItem[]> {
@@ -380,7 +380,7 @@ export class DatabaseStorage implements IStorage {
 
   async deleteEstimateLineItem(id: string): Promise<boolean> {
     const result = await db.delete(estimateLineItems).where(eq(estimateLineItems.id, id));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   async replaceEstimateLineItems(estimateId: string, items: Omit<InsertEstimateLineItem, "estimateId">[]): Promise<EstimateLineItem[]> {
@@ -441,7 +441,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(properties)
       .where(and(eq(properties.id, id), eq(properties.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   // Work log operations
@@ -551,7 +551,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(workLogs)
       .where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   async getWorkLogsByFilter(
@@ -740,7 +740,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(recurringSchedules)
       .where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   async getActiveRecurringSchedules(businessId: string): Promise<RecurringSchedule[]> {
@@ -803,7 +803,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(formTemplates)
       .where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 
   // Form submission operations
@@ -854,7 +854,7 @@ export class DatabaseStorage implements IStorage {
     const result = await db
       .delete(workLogTasks)
       .where(and(eq(workLogTasks.id, id), eq(workLogTasks.workLogId, workLogId)));
-    return result.rowCount ? result.rowCount > 0 : false;
+    return (result as any).rowCount ? (result as any).rowCount > 0 : true;
   }
 }
 

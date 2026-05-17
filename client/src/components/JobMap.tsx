@@ -129,7 +129,7 @@ export function JobMap({ workLogs, height, className, onPinClick, singleJob = fa
       markersRef.current = [];
       const bounds: [number, number][] = [];
 
-      for (const group of grouped.values()) {
+      for (const group of Array.from(grouped.values())) {
         const { lat, lng, workLog } = group[0];
         bounds.push([lat, lng]);
         const color = getColor(workLog.workType);
@@ -142,10 +142,10 @@ export function JobMap({ workLogs, height, className, onPinClick, singleJob = fa
           className: "",
         });
 
-        const jobs = group.map(g => g.workLog);
+        const jobs = group.map((g: MapPin) => g.workLog);
         const popupHtml = `
           <div style="min-width:180px;font-family:system-ui,sans-serif">
-            ${jobs.map(j => `
+            ${jobs.map((j: WorkLog) => `
               <div style="padding:4px 0;border-bottom:1px solid #e5e7eb">
                 <div style="font-weight:600;font-size:13px">${j.customerName}</div>
                 <div style="font-size:11px;color:#6b7280">${j.workType} · ${j.serviceDate}</div>

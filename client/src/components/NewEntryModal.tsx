@@ -322,7 +322,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
 
   const makeZoneHandler = (type: PhotoMeta["type"]) =>
     async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-      for (const file of result.successful) {
+      for (const file of result.successful || []) {
         try {
           const response = await apiRequest("PUT", "/api/objects/finalize", { objectUrl: file.uploadURL });
           const { objectPath } = await response.json();
@@ -372,7 +372,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   };
 
   const handlePdfUploadComplete = async (result: UploadResult<Record<string, unknown>, Record<string, unknown>>) => {
-    for (const file of result.successful) {
+    for (const file of result.successful || []) {
       try {
         const response = await apiRequest("PUT", "/api/objects/finalize", { objectUrl: file.uploadURL });
         const { objectPath } = await response.json();
