@@ -21,7 +21,7 @@ async function initializeApp() {
   initPromise = (async () => {
     try {
       // Dynamic import to avoid top-level errors
-      const { registerRoutes } = await import('../server/routes.js');
+      const { registerRoutes } = await import('./routes.js');
       await registerRoutes(app);
       initialized = true;
     } catch (err) {

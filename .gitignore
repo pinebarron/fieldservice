@@ -11,4 +11,4 @@ vite.config.ts.*
 .env.*.local
 
 # Vercel
-.vercelapi/index.js
+.vercel
