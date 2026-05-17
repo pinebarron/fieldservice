@@ -1057,19 +1057,22 @@ var init_supabaseStorage = __esm({
 });
 
 // server/supabaseAuth.ts
-function getSupabase2() {
-  if (!_supabase2) {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
-    if (!supabaseUrl) {
-      throw new Error("SUPABASE_URL environment variable is not set");
-    }
-    if (!supabaseKey) {
-      throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is not set");
-    }
-    _supabase2 = (0, import_supabase_js2.createClient)(supabaseUrl, supabaseKey);
+function getSupabaseUrl() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) throw new Error("SUPABASE_URL environment variable is not set");
+  return url;
+}
+function getSupabaseAuth() {
+  if (!_supabaseAuth) {
+    const supabaseUrl = getSupabaseUrl();
+    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!anonKey) throw new Error("SUPABASE_ANON_KEY environment variable is not set");
+    _supabaseAuth = (0, import_supabase_js2.createClient)(supabaseUrl, anonKey);
   }
-  return _supabase2;
+  return _supabaseAuth;
+}
+function getSupabase2() {
+  return getSupabaseAuth();
 }
 async function setupAuth(app2) {
   app2.set("trust proxy", 1);
@@ -1182,13 +1185,13 @@ function setAuthCookies(res, accessToken, refreshToken) {
   res.cookie("sb-access-token", accessToken, cookieOptions);
   res.cookie("sb-refresh-token", refreshToken, cookieOptions);
 }
-var import_supabase_js2, _supabase2, supabase2, isAuthenticated;
+var import_supabase_js2, _supabaseAuth, supabase2, isAuthenticated;
 var init_supabaseAuth = __esm({
   "server/supabaseAuth.ts"() {
     "use strict";
     import_supabase_js2 = require("@supabase/supabase-js");
     init_storage();
-    _supabase2 = null;
+    _supabaseAuth = null;
     supabase2 = new Proxy({}, {
       get(_, prop) {
         return getSupabase2()[prop];

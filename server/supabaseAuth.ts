@@ -2,23 +2,41 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
 
-// Lazy Supabase client - only created when first accessed
-let _supabase: SupabaseClient | null = null;
+// Lazy Supabase clients
+let _supabaseAuth: SupabaseClient | null = null;
+let _supabaseAdmin: SupabaseClient | null = null;
 
-function getSupabase(): SupabaseClient {
-  if (!_supabase) {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+function getSupabaseUrl(): string {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) throw new Error('SUPABASE_URL environment variable is not set');
+  return url;
+}
 
-    if (!supabaseUrl) {
-      throw new Error('SUPABASE_URL environment variable is not set');
-    }
-    if (!supabaseKey) {
-      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
-    }
-    _supabase = createClient(supabaseUrl, supabaseKey);
+// For auth operations (signIn, signUp) - uses anon key
+function getSupabaseAuth(): SupabaseClient {
+  if (!_supabaseAuth) {
+    const supabaseUrl = getSupabaseUrl();
+    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    if (!anonKey) throw new Error('SUPABASE_ANON_KEY environment variable is not set');
+    _supabaseAuth = createClient(supabaseUrl, anonKey);
   }
-  return _supabase;
+  return _supabaseAuth;
+}
+
+// For admin operations - uses service role key
+function getSupabaseAdmin(): SupabaseClient {
+  if (!_supabaseAdmin) {
+    const supabaseUrl = getSupabaseUrl();
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+    if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+    _supabaseAdmin = createClient(supabaseUrl, serviceKey);
+  }
+  return _supabaseAdmin;
+}
+
+// Alias for backward compatibility - uses auth client
+function getSupabase(): SupabaseClient {
+  return getSupabaseAuth();
 }
 
 // Proxy for backward compatibility
