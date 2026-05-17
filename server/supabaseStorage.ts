@@ -1,12 +1,22 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Response } from 'express';
 import { randomUUID } from 'crypto';
 
-// Create Supabase client with service role key for storage operations
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Lazy Supabase client for storage
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required');
+    }
+    _supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+  return _supabase;
+}
 
 const BUCKET_NAME = 'field-uploads';
 
@@ -26,7 +36,7 @@ export class ObjectStorageService {
     const objectId = randomUUID();
     const filePath = `uploads/${objectId}`;
 
-    const { data, error } = await supabase.storage
+    const { data, error } = await getSupabase().storage
       .from(BUCKET_NAME)
       .createSignedUploadUrl(filePath);
 
@@ -45,7 +55,7 @@ export class ObjectStorageService {
     // Normalize the path - remove leading /objects/ if present
     const normalizedPath = objectPath.replace(/^\/objects\//, '').replace(/^objects\//, '');
 
-    const { data, error } = await supabase.storage
+    const { data, error } = await getSupabase().storage
       .from(BUCKET_NAME)
       .download(normalizedPath);
 
@@ -151,7 +161,7 @@ export class ObjectStorageService {
   async deleteObject(objectPath: string): Promise<boolean> {
     const normalizedPath = objectPath.replace(/^\/objects\//, '').replace(/^objects\//, '');
 
-    const { error } = await supabase.storage
+    const { error } = await getSupabase().storage
       .from(BUCKET_NAME)
       .remove([normalizedPath]);
 

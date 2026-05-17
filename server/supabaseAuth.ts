@@ -1,19 +1,32 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Express, RequestHandler } from 'express';
 import { storage } from './storage';
 
-if (!process.env.SUPABASE_URL) {
-  throw new Error('SUPABASE_URL environment variable is not set');
-}
-if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+// Lazy Supabase client - only created when first accessed
+let _supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient {
+  if (!_supabase) {
+    if (!process.env.SUPABASE_URL) {
+      throw new Error('SUPABASE_URL environment variable is not set');
+    }
+    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
+    }
+    _supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+  }
+  return _supabase;
 }
 
-// Create Supabase client with service role key for server-side operations
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
+// Proxy for backward compatibility
+const supabase = new Proxy({} as SupabaseClient, {
+  get(_, prop) {
+    return (getSupabase() as any)[prop];
+  }
+});
 
 export async function setupAuth(app: Express) {
   app.set('trust proxy', 1);
