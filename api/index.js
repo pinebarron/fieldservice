@@ -1,5 +1,10 @@
+"use strict";
+var __create = Object.create;
 var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
 var __esm = (fn, res) => function __init() {
   return fn && (res = (0, fn[__getOwnPropNames(fn)[0]])(fn = 0)), res;
 };
@@ -7,6 +12,23 @@ var __export = (target, all) => {
   for (var name in all)
     __defProp(target, name, { get: all[name], enumerable: true });
 };
+var __copyProps = (to, from, except, desc2) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc2 = __getOwnPropDesc(from, key)) || desc2.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
 // shared/schema.ts
 var schema_exports = {};
@@ -53,342 +75,342 @@ __export(schema_exports, {
   workLogTasks: () => workLogTasks,
   workLogs: () => workLogs
 });
-import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, json, index } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
-var sessions, users, businesses, businessMembers, vendors, properties, pricingItems, estimates, estimateLineItems, apiClients, recurringSchedules, workLogs, formTemplates, formSubmissions, workLogTasks, upsertUserSchema, insertBusinessSchema, updateBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema, updateEstimateLineItemSchema, insertWorkLogSchema, updateWorkLogSchema, insertRecurringScheduleSchema, updateRecurringScheduleSchema, insertFormTemplateSchema, updateFormTemplateSchema, insertFormSubmissionSchema, insertWorkLogTaskSchema, updateWorkLogTaskSchema, workLogStatusSchema, recurrenceFrequencySchema, taskStatusSchema;
+var import_drizzle_orm, import_pg_core, import_drizzle_zod, import_zod, sessions, users, businesses, businessMembers, vendors, properties, pricingItems, estimates, estimateLineItems, apiClients, recurringSchedules, workLogs, formTemplates, formSubmissions, workLogTasks, upsertUserSchema, insertBusinessSchema, updateBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema, updateEstimateLineItemSchema, insertWorkLogSchema, updateWorkLogSchema, insertRecurringScheduleSchema, updateRecurringScheduleSchema, insertFormTemplateSchema, updateFormTemplateSchema, insertFormSubmissionSchema, insertWorkLogTaskSchema, updateWorkLogTaskSchema, workLogStatusSchema, recurrenceFrequencySchema, taskStatusSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
-    sessions = pgTable(
+    import_drizzle_orm = require("drizzle-orm");
+    import_pg_core = require("drizzle-orm/pg-core");
+    import_drizzle_zod = require("drizzle-zod");
+    import_zod = require("zod");
+    sessions = (0, import_pg_core.pgTable)(
       "sessions",
       {
-        sid: varchar("sid").primaryKey(),
-        sess: json("sess").notNull(),
-        expire: timestamp("expire").notNull()
+        sid: (0, import_pg_core.varchar)("sid").primaryKey(),
+        sess: (0, import_pg_core.json)("sess").notNull(),
+        expire: (0, import_pg_core.timestamp)("expire").notNull()
       },
-      (table) => [index("IDX_session_expire").on(table.expire)]
+      (table) => [(0, import_pg_core.index)("IDX_session_expire").on(table.expire)]
     );
-    users = pgTable("users", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      email: varchar("email").unique(),
-      firstName: varchar("first_name"),
-      lastName: varchar("last_name"),
-      profileImageUrl: varchar("profile_image_url"),
+    users = (0, import_pg_core.pgTable)("users", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      email: (0, import_pg_core.varchar)("email").unique(),
+      firstName: (0, import_pg_core.varchar)("first_name"),
+      lastName: (0, import_pg_core.varchar)("last_name"),
+      profileImageUrl: (0, import_pg_core.varchar)("profile_image_url"),
       // Google Calendar OAuth tokens
-      googleAccessToken: text("google_access_token"),
-      googleRefreshToken: text("google_refresh_token"),
-      googleTokenExpiresAt: text("google_token_expires_at"),
-      googleCalendarId: text("google_calendar_id"),
+      googleAccessToken: (0, import_pg_core.text)("google_access_token"),
+      googleRefreshToken: (0, import_pg_core.text)("google_refresh_token"),
+      googleTokenExpiresAt: (0, import_pg_core.text)("google_token_expires_at"),
+      googleCalendarId: (0, import_pg_core.text)("google_calendar_id"),
       // Selected calendar to sync with
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    businesses = pgTable("businesses", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      name: text("name").notNull(),
-      ownerId: varchar("owner_id").notNull().references(() => users.id),
-      address: text("address"),
-      city: text("city"),
-      state: text("state"),
-      zipCode: text("zip_code"),
-      phone: text("phone"),
-      overview: text("overview"),
-      hoursOfOperation: json("hours_of_operation").$type(),
-      brandColor: text("brand_color"),
-      logoUrl: text("logo_url"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    businesses = (0, import_pg_core.pgTable)("businesses", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      name: (0, import_pg_core.text)("name").notNull(),
+      ownerId: (0, import_pg_core.varchar)("owner_id").notNull().references(() => users.id),
+      address: (0, import_pg_core.text)("address"),
+      city: (0, import_pg_core.text)("city"),
+      state: (0, import_pg_core.text)("state"),
+      zipCode: (0, import_pg_core.text)("zip_code"),
+      phone: (0, import_pg_core.text)("phone"),
+      overview: (0, import_pg_core.text)("overview"),
+      hoursOfOperation: (0, import_pg_core.json)("hours_of_operation").$type(),
+      brandColor: (0, import_pg_core.text)("brand_color"),
+      logoUrl: (0, import_pg_core.text)("logo_url"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    businessMembers = pgTable("business_members", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      userId: varchar("user_id").notNull().references(() => users.id),
-      role: text("role").notNull().default("technician"),
-      createdAt: timestamp("created_at").defaultNow()
+    businessMembers = (0, import_pg_core.pgTable)("business_members", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      userId: (0, import_pg_core.varchar)("user_id").notNull().references(() => users.id),
+      role: (0, import_pg_core.text)("role").notNull().default("technician"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    vendors = pgTable("vendors", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      name: text("name").notNull(),
-      contactName: text("contact_name"),
-      contactEmail: text("contact_email"),
-      contactPhone: text("contact_phone"),
-      servicesProvided: json("services_provided").$type().default([]),
-      regionsServed: json("regions_served").$type().default([]),
-      insuranceProvider: text("insurance_provider"),
-      insurancePolicyNumber: text("insurance_policy_number"),
-      insuranceExpiry: text("insurance_expiry"),
-      licenseNumber: text("license_number"),
-      licenseExpiry: text("license_expiry"),
-      notes: text("notes"),
-      status: text("status").notNull().default("active"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    vendors = (0, import_pg_core.pgTable)("vendors", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      name: (0, import_pg_core.text)("name").notNull(),
+      contactName: (0, import_pg_core.text)("contact_name"),
+      contactEmail: (0, import_pg_core.text)("contact_email"),
+      contactPhone: (0, import_pg_core.text)("contact_phone"),
+      servicesProvided: (0, import_pg_core.json)("services_provided").$type().default([]),
+      regionsServed: (0, import_pg_core.json)("regions_served").$type().default([]),
+      insuranceProvider: (0, import_pg_core.text)("insurance_provider"),
+      insurancePolicyNumber: (0, import_pg_core.text)("insurance_policy_number"),
+      insuranceExpiry: (0, import_pg_core.text)("insurance_expiry"),
+      licenseNumber: (0, import_pg_core.text)("license_number"),
+      licenseExpiry: (0, import_pg_core.text)("license_expiry"),
+      notes: (0, import_pg_core.text)("notes"),
+      status: (0, import_pg_core.text)("status").notNull().default("active"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    properties = pgTable("properties", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      propertyName: text("property_name").notNull(),
-      customerName: text("customer_name").notNull(),
-      locationName: text("location_name").notNull(),
-      city: text("city").notNull(),
-      state: text("state").notNull(),
-      zipCode: text("zip_code").notNull(),
-      status: text("status").notNull().default("active"),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    properties = (0, import_pg_core.pgTable)("properties", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      propertyName: (0, import_pg_core.text)("property_name").notNull(),
+      customerName: (0, import_pg_core.text)("customer_name").notNull(),
+      locationName: (0, import_pg_core.text)("location_name").notNull(),
+      city: (0, import_pg_core.text)("city").notNull(),
+      state: (0, import_pg_core.text)("state").notNull(),
+      zipCode: (0, import_pg_core.text)("zip_code").notNull(),
+      status: (0, import_pg_core.text)("status").notNull().default("active"),
+      notes: (0, import_pg_core.text)("notes"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    pricingItems = pgTable("pricing_items", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      category: text("category").notNull().default("General"),
-      name: text("name").notNull(),
-      description: text("description"),
-      unit: text("unit").notNull().default("each"),
-      unitPrice: text("unit_price").notNull().default("0"),
-      isActive: text("is_active").notNull().default("true"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    pricingItems = (0, import_pg_core.pgTable)("pricing_items", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      category: (0, import_pg_core.text)("category").notNull().default("General"),
+      name: (0, import_pg_core.text)("name").notNull(),
+      description: (0, import_pg_core.text)("description"),
+      unit: (0, import_pg_core.text)("unit").notNull().default("each"),
+      unitPrice: (0, import_pg_core.text)("unit_price").notNull().default("0"),
+      isActive: (0, import_pg_core.text)("is_active").notNull().default("true"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    estimates = pgTable("estimates", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      propertyId: varchar("property_id").references(() => properties.id),
-      title: text("title").notNull(),
-      customerName: text("customer_name").notNull(),
-      customerEmail: text("customer_email"),
-      customerPhone: text("customer_phone"),
-      description: text("description"),
-      status: text("status").notNull().default("draft"),
-      validUntil: text("valid_until"),
-      taxRate: text("tax_rate").notNull().default("0"),
-      discountAmount: text("discount_amount").notNull().default("0"),
-      notes: text("notes"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+    estimates = (0, import_pg_core.pgTable)("estimates", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      propertyId: (0, import_pg_core.varchar)("property_id").references(() => properties.id),
+      title: (0, import_pg_core.text)("title").notNull(),
+      customerName: (0, import_pg_core.text)("customer_name").notNull(),
+      customerEmail: (0, import_pg_core.text)("customer_email"),
+      customerPhone: (0, import_pg_core.text)("customer_phone"),
+      description: (0, import_pg_core.text)("description"),
+      status: (0, import_pg_core.text)("status").notNull().default("draft"),
+      validUntil: (0, import_pg_core.text)("valid_until"),
+      taxRate: (0, import_pg_core.text)("tax_rate").notNull().default("0"),
+      discountAmount: (0, import_pg_core.text)("discount_amount").notNull().default("0"),
+      notes: (0, import_pg_core.text)("notes"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    estimateLineItems = pgTable("estimate_line_items", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      estimateId: varchar("estimate_id").notNull().references(() => estimates.id),
-      pricingItemId: varchar("pricing_item_id").references(() => pricingItems.id),
-      description: text("description").notNull(),
-      quantity: text("quantity").notNull().default("1"),
-      unit: text("unit").notNull().default("each"),
-      unitPrice: text("unit_price").notNull().default("0"),
-      sortOrder: text("sort_order").notNull().default("0")
+    estimateLineItems = (0, import_pg_core.pgTable)("estimate_line_items", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      estimateId: (0, import_pg_core.varchar)("estimate_id").notNull().references(() => estimates.id),
+      pricingItemId: (0, import_pg_core.varchar)("pricing_item_id").references(() => pricingItems.id),
+      description: (0, import_pg_core.text)("description").notNull(),
+      quantity: (0, import_pg_core.text)("quantity").notNull().default("1"),
+      unit: (0, import_pg_core.text)("unit").notNull().default("each"),
+      unitPrice: (0, import_pg_core.text)("unit_price").notNull().default("0"),
+      sortOrder: (0, import_pg_core.text)("sort_order").notNull().default("0")
     });
-    apiClients = pgTable("api_clients", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      name: text("name").notNull(),
-      clientId: text("client_id").notNull().unique(),
-      clientSecretHash: text("client_secret_hash").notNull(),
-      isActive: text("is_active").notNull().default("true"),
-      createdAt: timestamp("created_at").defaultNow()
+    apiClients = (0, import_pg_core.pgTable)("api_clients", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      name: (0, import_pg_core.text)("name").notNull(),
+      clientId: (0, import_pg_core.text)("client_id").notNull().unique(),
+      clientSecretHash: (0, import_pg_core.text)("client_secret_hash").notNull(),
+      isActive: (0, import_pg_core.text)("is_active").notNull().default("true"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow()
     });
-    recurringSchedules = pgTable("recurring_schedules", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      propertyId: varchar("property_id").references(() => properties.id),
+    recurringSchedules = (0, import_pg_core.pgTable)("recurring_schedules", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      propertyId: (0, import_pg_core.varchar)("property_id").references(() => properties.id),
       // Job details
-      customerName: text("customer_name").notNull(),
-      workType: text("work_type").notNull(),
-      locationName: text("location_name").notNull(),
-      city: text("city").notNull(),
-      state: text("state").notNull(),
-      zipCode: text("zip_code").notNull(),
-      workDescription: text("work_description").notNull(),
-      notes: text("notes"),
+      customerName: (0, import_pg_core.text)("customer_name").notNull(),
+      workType: (0, import_pg_core.text)("work_type").notNull(),
+      locationName: (0, import_pg_core.text)("location_name").notNull(),
+      city: (0, import_pg_core.text)("city").notNull(),
+      state: (0, import_pg_core.text)("state").notNull(),
+      zipCode: (0, import_pg_core.text)("zip_code").notNull(),
+      workDescription: (0, import_pg_core.text)("work_description").notNull(),
+      notes: (0, import_pg_core.text)("notes"),
       // Assigned technicians
-      technicianUserIds: json("technician_user_ids").$type().default([]),
+      technicianUserIds: (0, import_pg_core.json)("technician_user_ids").$type().default([]),
       // Schedule time (HH:mm format)
-      scheduledTime: text("scheduled_time").notNull(),
-      estimatedDurationMinutes: text("estimated_duration_minutes").default("60"),
+      scheduledTime: (0, import_pg_core.text)("scheduled_time").notNull(),
+      estimatedDurationMinutes: (0, import_pg_core.text)("estimated_duration_minutes").default("60"),
       // Recurrence pattern
-      frequency: text("frequency").notNull(),
+      frequency: (0, import_pg_core.text)("frequency").notNull(),
       // daily, weekly, monthly
-      interval: text("interval").notNull().default("1"),
+      interval: (0, import_pg_core.text)("interval").notNull().default("1"),
       // every N days/weeks/months
-      daysOfWeek: json("days_of_week").$type().default([]),
+      daysOfWeek: (0, import_pg_core.json)("days_of_week").$type().default([]),
       // 0=Sunday, 6=Saturday (for weekly)
-      dayOfMonth: text("day_of_month"),
+      dayOfMonth: (0, import_pg_core.text)("day_of_month"),
       // 1-31 or "last" (for monthly)
       // Date range
-      startDate: text("start_date").notNull(),
+      startDate: (0, import_pg_core.text)("start_date").notNull(),
       // YYYY-MM-DD
-      endDate: text("end_date"),
+      endDate: (0, import_pg_core.text)("end_date"),
       // YYYY-MM-DD (optional)
-      maxOccurrences: text("max_occurrences"),
+      maxOccurrences: (0, import_pg_core.text)("max_occurrences"),
       // optional limit
       // State
-      isActive: text("is_active").notNull().default("true"),
-      lastGeneratedDate: text("last_generated_date"),
+      isActive: (0, import_pg_core.text)("is_active").notNull().default("true"),
+      lastGeneratedDate: (0, import_pg_core.text)("last_generated_date"),
       // YYYY-MM-DD
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    workLogs = pgTable("work_logs", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      propertyId: varchar("property_id").references(() => properties.id),
-      technicianUserId: varchar("technician_user_id").notNull().references(() => users.id),
-      customerName: text("customer_name").notNull(),
-      workType: text("work_type").notNull(),
-      locationName: text("location_name").notNull(),
-      city: text("city").notNull(),
-      state: text("state").notNull(),
-      zipCode: text("zip_code").notNull(),
-      serviceDate: text("service_date").notNull(),
-      startTime: text("start_time"),
-      endTime: text("end_time"),
-      workPerformed: text("work_performed").notNull(),
-      additionalNotes: text("additional_notes"),
-      status: text("status").notNull().default("completed"),
+    workLogs = (0, import_pg_core.pgTable)("work_logs", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      propertyId: (0, import_pg_core.varchar)("property_id").references(() => properties.id),
+      technicianUserId: (0, import_pg_core.varchar)("technician_user_id").notNull().references(() => users.id),
+      customerName: (0, import_pg_core.text)("customer_name").notNull(),
+      workType: (0, import_pg_core.text)("work_type").notNull(),
+      locationName: (0, import_pg_core.text)("location_name").notNull(),
+      city: (0, import_pg_core.text)("city").notNull(),
+      state: (0, import_pg_core.text)("state").notNull(),
+      zipCode: (0, import_pg_core.text)("zip_code").notNull(),
+      serviceDate: (0, import_pg_core.text)("service_date").notNull(),
+      startTime: (0, import_pg_core.text)("start_time"),
+      endTime: (0, import_pg_core.text)("end_time"),
+      workPerformed: (0, import_pg_core.text)("work_performed").notNull(),
+      additionalNotes: (0, import_pg_core.text)("additional_notes"),
+      status: (0, import_pg_core.text)("status").notNull().default("completed"),
       // scheduled, in-progress, completed, cancelled
-      technicianUserIds: json("technician_user_ids").$type().default([]),
-      imageUrls: json("image_urls").$type().default([]),
-      pdfUrls: json("pdf_urls").$type().default([]),
-      photoMetadata: json("photo_metadata").$type().default([]),
-      checkInTime: text("check_in_time"),
-      checkOutTime: text("check_out_time"),
-      checkInLat: text("check_in_lat"),
-      checkInLng: text("check_in_lng"),
-      checkOutLat: text("check_out_lat"),
-      checkOutLng: text("check_out_lng"),
+      technicianUserIds: (0, import_pg_core.json)("technician_user_ids").$type().default([]),
+      imageUrls: (0, import_pg_core.json)("image_urls").$type().default([]),
+      pdfUrls: (0, import_pg_core.json)("pdf_urls").$type().default([]),
+      photoMetadata: (0, import_pg_core.json)("photo_metadata").$type().default([]),
+      checkInTime: (0, import_pg_core.text)("check_in_time"),
+      checkOutTime: (0, import_pg_core.text)("check_out_time"),
+      checkInLat: (0, import_pg_core.text)("check_in_lat"),
+      checkInLng: (0, import_pg_core.text)("check_in_lng"),
+      checkOutLat: (0, import_pg_core.text)("check_out_lat"),
+      checkOutLng: (0, import_pg_core.text)("check_out_lng"),
       // Scheduling fields
-      scheduledStartTime: text("scheduled_start_time"),
+      scheduledStartTime: (0, import_pg_core.text)("scheduled_start_time"),
       // ISO datetime for scheduled start
-      scheduledEndTime: text("scheduled_end_time"),
+      scheduledEndTime: (0, import_pg_core.text)("scheduled_end_time"),
       // ISO datetime for scheduled end
-      recurringScheduleId: varchar("recurring_schedule_id").references(() => recurringSchedules.id),
-      isRecurrenceInstance: text("is_recurrence_instance").default("false"),
+      recurringScheduleId: (0, import_pg_core.varchar)("recurring_schedule_id").references(() => recurringSchedules.id),
+      isRecurrenceInstance: (0, import_pg_core.text)("is_recurrence_instance").default("false"),
       // flag for auto-generated jobs
       // Google Calendar integration
-      googleCalendarEventId: text("google_calendar_event_id"),
-      googleCalendarSyncedAt: text("google_calendar_synced_at"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      googleCalendarEventId: (0, import_pg_core.text)("google_calendar_event_id"),
+      googleCalendarSyncedAt: (0, import_pg_core.text)("google_calendar_synced_at"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    formTemplates = pgTable("form_templates", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      businessId: varchar("business_id").notNull().references(() => businesses.id),
-      name: text("name").notNull(),
-      description: text("description"),
-      workType: text("work_type"),
+    formTemplates = (0, import_pg_core.pgTable)("form_templates", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      businessId: (0, import_pg_core.varchar)("business_id").notNull().references(() => businesses.id),
+      name: (0, import_pg_core.text)("name").notNull(),
+      description: (0, import_pg_core.text)("description"),
+      workType: (0, import_pg_core.text)("work_type"),
       // linked to specific work type or null for all
-      schema: json("schema").$type().notNull(),
-      logicRules: json("logic_rules").$type().default([]),
-      isActive: text("is_active").notNull().default("true"),
-      createdAt: timestamp("created_at").defaultNow(),
-      updatedAt: timestamp("updated_at").defaultNow()
+      schema: (0, import_pg_core.json)("schema").$type().notNull(),
+      logicRules: (0, import_pg_core.json)("logic_rules").$type().default([]),
+      isActive: (0, import_pg_core.text)("is_active").notNull().default("true"),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      updatedAt: (0, import_pg_core.timestamp)("updated_at").defaultNow()
     });
-    formSubmissions = pgTable("form_submissions", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      workLogId: varchar("work_log_id").notNull().references(() => workLogs.id),
-      templateId: varchar("template_id").notNull().references(() => formTemplates.id),
-      responses: json("responses").$type().notNull(),
-      submittedAt: timestamp("submitted_at").defaultNow()
+    formSubmissions = (0, import_pg_core.pgTable)("form_submissions", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      workLogId: (0, import_pg_core.varchar)("work_log_id").notNull().references(() => workLogs.id),
+      templateId: (0, import_pg_core.varchar)("template_id").notNull().references(() => formTemplates.id),
+      responses: (0, import_pg_core.json)("responses").$type().notNull(),
+      submittedAt: (0, import_pg_core.timestamp)("submitted_at").defaultNow()
     });
-    workLogTasks = pgTable("work_log_tasks", {
-      id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-      workLogId: varchar("work_log_id").notNull().references(() => workLogs.id),
-      parentTaskId: varchar("parent_task_id").references(() => workLogTasks.id),
-      title: text("title").notNull(),
-      description: text("description"),
-      status: text("status").notNull().default("pending"),
+    workLogTasks = (0, import_pg_core.pgTable)("work_log_tasks", {
+      id: (0, import_pg_core.varchar)("id").primaryKey().default(import_drizzle_orm.sql`gen_random_uuid()`),
+      workLogId: (0, import_pg_core.varchar)("work_log_id").notNull().references(() => workLogs.id),
+      parentTaskId: (0, import_pg_core.varchar)("parent_task_id").references(() => workLogTasks.id),
+      title: (0, import_pg_core.text)("title").notNull(),
+      description: (0, import_pg_core.text)("description"),
+      status: (0, import_pg_core.text)("status").notNull().default("pending"),
       // pending, in_progress, completed, cancelled
-      priority: text("priority").default("normal"),
+      priority: (0, import_pg_core.text)("priority").default("normal"),
       // low, normal, high, urgent
-      assignedUserId: varchar("assigned_user_id").references(() => users.id),
-      dueDate: text("due_date"),
-      createdFromForm: varchar("created_from_form").references(() => formSubmissions.id),
-      createdAt: timestamp("created_at").defaultNow(),
-      completedAt: timestamp("completed_at")
+      assignedUserId: (0, import_pg_core.varchar)("assigned_user_id").references(() => users.id),
+      dueDate: (0, import_pg_core.text)("due_date"),
+      createdFromForm: (0, import_pg_core.varchar)("created_from_form").references(() => formSubmissions.id),
+      createdAt: (0, import_pg_core.timestamp)("created_at").defaultNow(),
+      completedAt: (0, import_pg_core.timestamp)("completed_at")
     });
-    upsertUserSchema = createInsertSchema(users);
-    insertBusinessSchema = createInsertSchema(businesses).omit({
+    upsertUserSchema = (0, import_drizzle_zod.createInsertSchema)(users);
+    insertBusinessSchema = (0, import_drizzle_zod.createInsertSchema)(businesses).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
-    updateBusinessSchema = z.object({
-      name: z.string().optional(),
-      address: z.string().optional(),
-      city: z.string().optional(),
-      state: z.string().optional(),
-      zipCode: z.string().optional(),
-      phone: z.string().optional(),
-      overview: z.string().optional(),
-      hoursOfOperation: z.record(z.object({ open: z.string(), close: z.string(), closed: z.boolean() })).optional(),
-      brandColor: z.string().optional(),
-      logoUrl: z.string().optional()
+    updateBusinessSchema = import_zod.z.object({
+      name: import_zod.z.string().optional(),
+      address: import_zod.z.string().optional(),
+      city: import_zod.z.string().optional(),
+      state: import_zod.z.string().optional(),
+      zipCode: import_zod.z.string().optional(),
+      phone: import_zod.z.string().optional(),
+      overview: import_zod.z.string().optional(),
+      hoursOfOperation: import_zod.z.record(import_zod.z.object({ open: import_zod.z.string(), close: import_zod.z.string(), closed: import_zod.z.boolean() })).optional(),
+      brandColor: import_zod.z.string().optional(),
+      logoUrl: import_zod.z.string().optional()
     });
-    insertBusinessMemberSchema = createInsertSchema(businessMembers).omit({
+    insertBusinessMemberSchema = (0, import_drizzle_zod.createInsertSchema)(businessMembers).omit({
       id: true,
       createdAt: true
     });
-    insertVendorSchema = createInsertSchema(vendors).omit({
+    insertVendorSchema = (0, import_drizzle_zod.createInsertSchema)(vendors).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updateVendorSchema = insertVendorSchema.partial();
-    insertPropertySchema = createInsertSchema(properties).omit({
+    insertPropertySchema = (0, import_drizzle_zod.createInsertSchema)(properties).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updatePropertySchema = insertPropertySchema.partial();
-    insertPricingItemSchema = createInsertSchema(pricingItems).omit({
+    insertPricingItemSchema = (0, import_drizzle_zod.createInsertSchema)(pricingItems).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updatePricingItemSchema = insertPricingItemSchema.partial();
-    insertEstimateSchema = createInsertSchema(estimates).omit({
+    insertEstimateSchema = (0, import_drizzle_zod.createInsertSchema)(estimates).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updateEstimateSchema = insertEstimateSchema.partial();
-    insertEstimateLineItemSchema = createInsertSchema(estimateLineItems).omit({
+    insertEstimateLineItemSchema = (0, import_drizzle_zod.createInsertSchema)(estimateLineItems).omit({
       id: true
     });
     updateEstimateLineItemSchema = insertEstimateLineItemSchema.partial();
-    insertWorkLogSchema = createInsertSchema(workLogs).omit({
+    insertWorkLogSchema = (0, import_drizzle_zod.createInsertSchema)(workLogs).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updateWorkLogSchema = insertWorkLogSchema.partial();
-    insertRecurringScheduleSchema = createInsertSchema(recurringSchedules).omit({
+    insertRecurringScheduleSchema = (0, import_drizzle_zod.createInsertSchema)(recurringSchedules).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updateRecurringScheduleSchema = insertRecurringScheduleSchema.partial();
-    insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
+    insertFormTemplateSchema = (0, import_drizzle_zod.createInsertSchema)(formTemplates).omit({
       id: true,
       createdAt: true,
       updatedAt: true
     });
     updateFormTemplateSchema = insertFormTemplateSchema.partial();
-    insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+    insertFormSubmissionSchema = (0, import_drizzle_zod.createInsertSchema)(formSubmissions).omit({
       id: true,
       submittedAt: true
     });
-    insertWorkLogTaskSchema = createInsertSchema(workLogTasks).omit({
+    insertWorkLogTaskSchema = (0, import_drizzle_zod.createInsertSchema)(workLogTasks).omit({
       id: true,
       createdAt: true,
       completedAt: true
     });
     updateWorkLogTaskSchema = insertWorkLogTaskSchema.partial();
-    workLogStatusSchema = z.enum(["scheduled", "in-progress", "completed", "cancelled"]);
-    recurrenceFrequencySchema = z.enum(["daily", "weekly", "monthly"]);
-    taskStatusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
+    workLogStatusSchema = import_zod.z.enum(["scheduled", "in-progress", "completed", "cancelled"]);
+    recurrenceFrequencySchema = import_zod.z.enum(["daily", "weekly", "monthly"]);
+    taskStatusSchema = import_zod.z.enum(["pending", "in_progress", "completed", "cancelled"]);
   }
 });
 
@@ -397,35 +419,35 @@ var db_exports = {};
 __export(db_exports, {
   db: () => db
 });
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-var client, db;
+var import_postgres_js, import_postgres, client, db;
 var init_db = __esm({
   "server/db.ts"() {
     "use strict";
+    import_postgres_js = require("drizzle-orm/postgres-js");
+    import_postgres = __toESM(require("postgres"), 1);
     init_schema();
-    client = postgres(process.env.DATABASE_URL, { prepare: false });
-    db = drizzle(client, { schema: schema_exports });
+    client = (0, import_postgres.default)(process.env.DATABASE_URL, { prepare: false });
+    db = (0, import_postgres_js.drizzle)(client, { schema: schema_exports });
   }
 });
 
 // server/storage.ts
-import crypto2 from "crypto";
-import { eq, and, desc, sql as sql2, ilike, or, isNull } from "drizzle-orm";
-var DatabaseStorage, storage;
+var import_crypto, import_drizzle_orm2, DatabaseStorage, storage;
 var init_storage = __esm({
   "server/storage.ts"() {
     "use strict";
     init_schema();
+    import_crypto = __toESM(require("crypto"), 1);
     init_db();
+    import_drizzle_orm2 = require("drizzle-orm");
     DatabaseStorage = class {
       // User operations
       async getUser(id) {
-        const [user] = await db.select().from(users).where(eq(users.id, id));
+        const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.id, id));
         return user;
       }
       async getUserByEmail(email) {
-        const [user] = await db.select().from(users).where(eq(users.email, email));
+        const [user] = await db.select().from(users).where((0, import_drizzle_orm2.eq)(users.email, email));
         return user;
       }
       async createUser(userData) {
@@ -448,21 +470,21 @@ var init_storage = __esm({
         return business;
       }
       async getBusiness(id) {
-        const [business] = await db.select().from(businesses).where(eq(businesses.id, id));
+        const [business] = await db.select().from(businesses).where((0, import_drizzle_orm2.eq)(businesses.id, id));
         return business;
       }
       async getBusinessByOwnerId(ownerId) {
-        const [business] = await db.select().from(businesses).where(eq(businesses.ownerId, ownerId));
+        const [business] = await db.select().from(businesses).where((0, import_drizzle_orm2.eq)(businesses.ownerId, ownerId));
         return business;
       }
       async getBusinessByUserId(userId) {
-        const [owned] = await db.select().from(businesses).where(eq(businesses.ownerId, userId));
+        const [owned] = await db.select().from(businesses).where((0, import_drizzle_orm2.eq)(businesses.ownerId, userId));
         if (owned) return owned;
-        const [membership] = await db.select({ business: businesses }).from(businessMembers).innerJoin(businesses, eq(businessMembers.businessId, businesses.id)).where(eq(businessMembers.userId, userId));
+        const [membership] = await db.select({ business: businesses }).from(businessMembers).innerJoin(businesses, (0, import_drizzle_orm2.eq)(businessMembers.businessId, businesses.id)).where((0, import_drizzle_orm2.eq)(businessMembers.userId, userId));
         return membership?.business;
       }
       async updateBusiness(id, updates) {
-        const [business] = await db.update(businesses).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(eq(businesses.id, id)).returning();
+        const [business] = await db.update(businesses).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.eq)(businesses.id, id)).returning();
         return business;
       }
       // Business member operations
@@ -478,15 +500,15 @@ var init_storage = __esm({
           role: businessMembers.role,
           createdAt: businessMembers.createdAt,
           user: users
-        }).from(businessMembers).innerJoin(users, eq(businessMembers.userId, users.id)).where(eq(businessMembers.businessId, businessId));
+        }).from(businessMembers).innerJoin(users, (0, import_drizzle_orm2.eq)(businessMembers.userId, users.id)).where((0, import_drizzle_orm2.eq)(businessMembers.businessId, businessId));
         return members;
       }
       async updateBusinessMemberRole(id, role) {
-        const [member] = await db.update(businessMembers).set({ role }).where(eq(businessMembers.id, id)).returning();
+        const [member] = await db.update(businessMembers).set({ role }).where((0, import_drizzle_orm2.eq)(businessMembers.id, id)).returning();
         return member;
       }
       async removeBusinessMember(id) {
-        const result = await db.delete(businessMembers).where(eq(businessMembers.id, id));
+        const result = await db.delete(businessMembers).where((0, import_drizzle_orm2.eq)(businessMembers.id, id));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       // Vendor operations
@@ -495,18 +517,18 @@ var init_storage = __esm({
         return vendor;
       }
       async getVendors(businessId) {
-        return db.select().from(vendors).where(eq(vendors.businessId, businessId)).orderBy(desc(vendors.createdAt));
+        return db.select().from(vendors).where((0, import_drizzle_orm2.eq)(vendors.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(vendors.createdAt));
       }
       async getVendor(id, businessId) {
-        const [vendor] = await db.select().from(vendors).where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)));
+        const [vendor] = await db.select().from(vendors).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(vendors.id, id), (0, import_drizzle_orm2.eq)(vendors.businessId, businessId)));
         return vendor;
       }
       async updateVendor(id, businessId, updates) {
-        const [vendor] = await db.update(vendors).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(vendors.id, id), eq(vendors.businessId, businessId))).returning();
+        const [vendor] = await db.update(vendors).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(vendors.id, id), (0, import_drizzle_orm2.eq)(vendors.businessId, businessId))).returning();
         return vendor;
       }
       async deleteVendor(id, businessId) {
-        const result = await db.delete(vendors).where(and(eq(vendors.id, id), eq(vendors.businessId, businessId)));
+        const result = await db.delete(vendors).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(vendors.id, id), (0, import_drizzle_orm2.eq)(vendors.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       // Pricing item operations
@@ -515,14 +537,14 @@ var init_storage = __esm({
         return item;
       }
       async getPricingItems(businessId) {
-        return db.select().from(pricingItems).where(eq(pricingItems.businessId, businessId)).orderBy(pricingItems.category, pricingItems.name);
+        return db.select().from(pricingItems).where((0, import_drizzle_orm2.eq)(pricingItems.businessId, businessId)).orderBy(pricingItems.category, pricingItems.name);
       }
       async updatePricingItem(id, businessId, updates) {
-        const [item] = await db.update(pricingItems).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(pricingItems.id, id), eq(pricingItems.businessId, businessId))).returning();
+        const [item] = await db.update(pricingItems).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(pricingItems.id, id), (0, import_drizzle_orm2.eq)(pricingItems.businessId, businessId))).returning();
         return item;
       }
       async deletePricingItem(id, businessId) {
-        const result = await db.delete(pricingItems).where(and(eq(pricingItems.id, id), eq(pricingItems.businessId, businessId)));
+        const result = await db.delete(pricingItems).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(pricingItems.id, id), (0, import_drizzle_orm2.eq)(pricingItems.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       // Estimate operations
@@ -531,38 +553,38 @@ var init_storage = __esm({
         return estimate;
       }
       async getEstimates(businessId) {
-        return db.select().from(estimates).where(eq(estimates.businessId, businessId)).orderBy(desc(estimates.createdAt));
+        return db.select().from(estimates).where((0, import_drizzle_orm2.eq)(estimates.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(estimates.createdAt));
       }
       async getEstimate(id, businessId) {
-        const [estimate] = await db.select().from(estimates).where(and(eq(estimates.id, id), eq(estimates.businessId, businessId)));
+        const [estimate] = await db.select().from(estimates).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(estimates.id, id), (0, import_drizzle_orm2.eq)(estimates.businessId, businessId)));
         return estimate;
       }
       async updateEstimate(id, businessId, updates) {
-        const [estimate] = await db.update(estimates).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(estimates.id, id), eq(estimates.businessId, businessId))).returning();
+        const [estimate] = await db.update(estimates).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(estimates.id, id), (0, import_drizzle_orm2.eq)(estimates.businessId, businessId))).returning();
         return estimate;
       }
       async deleteEstimate(id, businessId) {
-        await db.delete(estimateLineItems).where(eq(estimateLineItems.estimateId, id));
-        const result = await db.delete(estimates).where(and(eq(estimates.id, id), eq(estimates.businessId, businessId)));
+        await db.delete(estimateLineItems).where((0, import_drizzle_orm2.eq)(estimateLineItems.estimateId, id));
+        const result = await db.delete(estimates).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(estimates.id, id), (0, import_drizzle_orm2.eq)(estimates.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       async getEstimateLineItems(estimateId) {
-        return db.select().from(estimateLineItems).where(eq(estimateLineItems.estimateId, estimateId)).orderBy(estimateLineItems.sortOrder);
+        return db.select().from(estimateLineItems).where((0, import_drizzle_orm2.eq)(estimateLineItems.estimateId, estimateId)).orderBy(estimateLineItems.sortOrder);
       }
       async addEstimateLineItem(item) {
         const [lineItem] = await db.insert(estimateLineItems).values(item).returning();
         return lineItem;
       }
       async updateEstimateLineItem(id, updates) {
-        const [lineItem] = await db.update(estimateLineItems).set(updates).where(eq(estimateLineItems.id, id)).returning();
+        const [lineItem] = await db.update(estimateLineItems).set(updates).where((0, import_drizzle_orm2.eq)(estimateLineItems.id, id)).returning();
         return lineItem;
       }
       async deleteEstimateLineItem(id) {
-        const result = await db.delete(estimateLineItems).where(eq(estimateLineItems.id, id));
+        const result = await db.delete(estimateLineItems).where((0, import_drizzle_orm2.eq)(estimateLineItems.id, id));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       async replaceEstimateLineItems(estimateId, items) {
-        await db.delete(estimateLineItems).where(eq(estimateLineItems.estimateId, estimateId));
+        await db.delete(estimateLineItems).where((0, import_drizzle_orm2.eq)(estimateLineItems.estimateId, estimateId));
         if (items.length === 0) return [];
         const toInsert = items.map((item, i) => ({ ...item, estimateId, sortOrder: String(i) }));
         return db.insert(estimateLineItems).values(toInsert).returning();
@@ -573,26 +595,26 @@ var init_storage = __esm({
         return property;
       }
       async getProperties(businessId) {
-        const props = await db.select().from(properties).where(eq(properties.businessId, businessId)).orderBy(desc(properties.createdAt));
+        const props = await db.select().from(properties).where((0, import_drizzle_orm2.eq)(properties.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(properties.createdAt));
         const withCounts = await Promise.all(
           props.map(async (p) => {
-            const [{ count }] = await db.select({ count: sql2`count(*)::int` }).from(workLogs).where(eq(workLogs.propertyId, p.id));
+            const [{ count }] = await db.select({ count: import_drizzle_orm2.sql`count(*)::int` }).from(workLogs).where((0, import_drizzle_orm2.eq)(workLogs.propertyId, p.id));
             return { ...p, workLogCount: count };
           })
         );
         return withCounts;
       }
       async getProperty(id, businessId) {
-        const [property] = await db.select().from(properties).where(and(eq(properties.id, id), eq(properties.businessId, businessId)));
+        const [property] = await db.select().from(properties).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(properties.id, id), (0, import_drizzle_orm2.eq)(properties.businessId, businessId)));
         return property;
       }
       async updateProperty(id, businessId, updates) {
-        const [property] = await db.update(properties).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(properties.id, id), eq(properties.businessId, businessId))).returning();
+        const [property] = await db.update(properties).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(properties.id, id), (0, import_drizzle_orm2.eq)(properties.businessId, businessId))).returning();
         return property;
       }
       async deleteProperty(id, businessId) {
-        await db.update(workLogs).set({ propertyId: null }).where(and(eq(workLogs.propertyId, id), eq(workLogs.businessId, businessId)));
-        const result = await db.delete(properties).where(and(eq(properties.id, id), eq(properties.businessId, businessId)));
+        await db.update(workLogs).set({ propertyId: null }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogs.propertyId, id), (0, import_drizzle_orm2.eq)(workLogs.businessId, businessId)));
+        const result = await db.delete(properties).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(properties.id, id), (0, import_drizzle_orm2.eq)(properties.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       // Work log operations
@@ -633,35 +655,35 @@ var init_storage = __esm({
           createdAt: workLogs.createdAt,
           updatedAt: workLogs.updatedAt,
           technician: users
-        }).from(workLogs).innerJoin(users, eq(workLogs.technicianUserId, users.id)).where(eq(workLogs.businessId, businessId)).orderBy(desc(workLogs.createdAt));
+        }).from(workLogs).innerJoin(users, (0, import_drizzle_orm2.eq)(workLogs.technicianUserId, users.id)).where((0, import_drizzle_orm2.eq)(workLogs.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(workLogs.createdAt));
         return logs;
       }
       async getWorkLog(id, businessId) {
-        const [log] = await db.select().from(workLogs).where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId)));
+        const [log] = await db.select().from(workLogs).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogs.id, id), (0, import_drizzle_orm2.eq)(workLogs.businessId, businessId)));
         return log;
       }
       async createApiClient(businessId, name) {
-        const clientId = `fc_id_${crypto2.randomBytes(12).toString("hex")}`;
-        const clientSecret = `fc_secret_${crypto2.randomBytes(24).toString("hex")}`;
-        const clientSecretHash = crypto2.createHash("sha256").update(clientSecret).digest("hex");
+        const clientId = `fc_id_${import_crypto.default.randomBytes(12).toString("hex")}`;
+        const clientSecret = `fc_secret_${import_crypto.default.randomBytes(24).toString("hex")}`;
+        const clientSecretHash = import_crypto.default.createHash("sha256").update(clientSecret).digest("hex");
         const [record] = await db.insert(apiClients).values({ businessId, name, clientId, clientSecretHash }).returning();
         return { clientId, clientSecret, record };
       }
       async getApiClients(businessId) {
-        return db.select().from(apiClients).where(eq(apiClients.businessId, businessId)).orderBy(desc(apiClients.createdAt));
+        return db.select().from(apiClients).where((0, import_drizzle_orm2.eq)(apiClients.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(apiClients.createdAt));
       }
       async getApiClientByClientId(clientId) {
-        const [record] = await db.select().from(apiClients).where(eq(apiClients.clientId, clientId));
+        const [record] = await db.select().from(apiClients).where((0, import_drizzle_orm2.eq)(apiClients.clientId, clientId));
         return record;
       }
       async revokeApiClient(id, businessId) {
-        const [updated] = await db.update(apiClients).set({ isActive: "false" }).where(and(eq(apiClients.id, id), eq(apiClients.businessId, businessId))).returning();
+        const [updated] = await db.update(apiClients).set({ isActive: "false" }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(apiClients.id, id), (0, import_drizzle_orm2.eq)(apiClients.businessId, businessId))).returning();
         return !!updated;
       }
       async verifyApiClient(clientId, clientSecret) {
         const record = await this.getApiClientByClientId(clientId);
         if (!record || record.isActive !== "true") return void 0;
-        const hash = crypto2.createHash("sha256").update(clientSecret).digest("hex");
+        const hash = import_crypto.default.createHash("sha256").update(clientSecret).digest("hex");
         if (hash !== record.clientSecretHash) return void 0;
         return record;
       }
@@ -670,32 +692,32 @@ var init_storage = __esm({
         return workLog;
       }
       async updateWorkLog(id, businessId, updates) {
-        const [workLog] = await db.update(workLogs).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId))).returning();
+        const [workLog] = await db.update(workLogs).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogs.id, id), (0, import_drizzle_orm2.eq)(workLogs.businessId, businessId))).returning();
         return workLog;
       }
       async deleteWorkLog(id, businessId) {
-        const result = await db.delete(workLogs).where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId)));
+        const result = await db.delete(workLogs).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogs.id, id), (0, import_drizzle_orm2.eq)(workLogs.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       async getWorkLogsByFilter(businessId, filters) {
-        const conditions = [eq(workLogs.businessId, businessId)];
+        const conditions = [(0, import_drizzle_orm2.eq)(workLogs.businessId, businessId)];
         if (filters.workType) {
-          conditions.push(ilike(workLogs.workType, `%${filters.workType}%`));
+          conditions.push((0, import_drizzle_orm2.ilike)(workLogs.workType, `%${filters.workType}%`));
         }
         if (filters.customerName) {
-          conditions.push(ilike(workLogs.customerName, `%${filters.customerName}%`));
+          conditions.push((0, import_drizzle_orm2.ilike)(workLogs.customerName, `%${filters.customerName}%`));
         }
         if (filters.technicianUserId) {
-          conditions.push(eq(workLogs.technicianUserId, filters.technicianUserId));
+          conditions.push((0, import_drizzle_orm2.eq)(workLogs.technicianUserId, filters.technicianUserId));
         }
         if (filters.dateFrom) {
-          conditions.push(sql2`${workLogs.serviceDate} >= ${filters.dateFrom}`);
+          conditions.push(import_drizzle_orm2.sql`${workLogs.serviceDate} >= ${filters.dateFrom}`);
         }
         if (filters.dateTo) {
-          conditions.push(sql2`${workLogs.serviceDate} <= ${filters.dateTo}`);
+          conditions.push(import_drizzle_orm2.sql`${workLogs.serviceDate} <= ${filters.dateTo}`);
         }
         if (filters.propertyId) {
-          conditions.push(eq(workLogs.propertyId, filters.propertyId));
+          conditions.push((0, import_drizzle_orm2.eq)(workLogs.propertyId, filters.propertyId));
         }
         const logs = await db.select({
           id: workLogs.id,
@@ -733,7 +755,7 @@ var init_storage = __esm({
           createdAt: workLogs.createdAt,
           updatedAt: workLogs.updatedAt,
           technician: users
-        }).from(workLogs).innerJoin(users, eq(workLogs.technicianUserId, users.id)).where(and(...conditions)).orderBy(desc(workLogs.createdAt));
+        }).from(workLogs).innerJoin(users, (0, import_drizzle_orm2.eq)(workLogs.technicianUserId, users.id)).where((0, import_drizzle_orm2.and)(...conditions)).orderBy((0, import_drizzle_orm2.desc)(workLogs.createdAt));
         return logs;
       }
       // Schedule operations
@@ -779,25 +801,25 @@ var init_storage = __esm({
           createdAt: workLogs.createdAt,
           updatedAt: workLogs.updatedAt,
           technician: users
-        }).from(workLogs).innerJoin(users, eq(workLogs.technicianUserId, users.id)).where(
-          and(
-            eq(workLogs.businessId, businessId),
-            sql2`${workLogs.serviceDate} >= ${startDate}`,
-            sql2`${workLogs.serviceDate} < ${adjustedEndDate}`
+        }).from(workLogs).innerJoin(users, (0, import_drizzle_orm2.eq)(workLogs.technicianUserId, users.id)).where(
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.eq)(workLogs.businessId, businessId),
+            import_drizzle_orm2.sql`${workLogs.serviceDate} >= ${startDate}`,
+            import_drizzle_orm2.sql`${workLogs.serviceDate} < ${adjustedEndDate}`
           )
         ).orderBy(workLogs.serviceDate, workLogs.scheduledStartTime);
         return logs;
       }
       async updateWorkLogStatus(id, businessId, status) {
-        const [workLog] = await db.update(workLogs).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId))).returning();
+        const [workLog] = await db.update(workLogs).set({ status, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogs.id, id), (0, import_drizzle_orm2.eq)(workLogs.businessId, businessId))).returning();
         return workLog;
       }
       // Recurring schedule operations
       async getRecurringSchedules(businessId) {
-        return db.select().from(recurringSchedules).where(eq(recurringSchedules.businessId, businessId)).orderBy(desc(recurringSchedules.createdAt));
+        return db.select().from(recurringSchedules).where((0, import_drizzle_orm2.eq)(recurringSchedules.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(recurringSchedules.createdAt));
       }
       async getRecurringSchedule(id, businessId) {
-        const [schedule] = await db.select().from(recurringSchedules).where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId)));
+        const [schedule] = await db.select().from(recurringSchedules).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(recurringSchedules.id, id), (0, import_drizzle_orm2.eq)(recurringSchedules.businessId, businessId)));
         return schedule;
       }
       async createRecurringSchedule(scheduleData) {
@@ -805,35 +827,35 @@ var init_storage = __esm({
         return schedule;
       }
       async updateRecurringSchedule(id, businessId, updates) {
-        const [schedule] = await db.update(recurringSchedules).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId))).returning();
+        const [schedule] = await db.update(recurringSchedules).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(recurringSchedules.id, id), (0, import_drizzle_orm2.eq)(recurringSchedules.businessId, businessId))).returning();
         return schedule;
       }
       async deleteRecurringSchedule(id, businessId) {
-        const result = await db.delete(recurringSchedules).where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId)));
+        const result = await db.delete(recurringSchedules).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(recurringSchedules.id, id), (0, import_drizzle_orm2.eq)(recurringSchedules.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       async getActiveRecurringSchedules(businessId) {
         return db.select().from(recurringSchedules).where(
-          and(
-            eq(recurringSchedules.businessId, businessId),
-            eq(recurringSchedules.isActive, "true")
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.eq)(recurringSchedules.businessId, businessId),
+            (0, import_drizzle_orm2.eq)(recurringSchedules.isActive, "true")
           )
         );
       }
       // Form template operations
       async getFormTemplates(businessId) {
-        return db.select().from(formTemplates).where(eq(formTemplates.businessId, businessId)).orderBy(desc(formTemplates.createdAt));
+        return db.select().from(formTemplates).where((0, import_drizzle_orm2.eq)(formTemplates.businessId, businessId)).orderBy((0, import_drizzle_orm2.desc)(formTemplates.createdAt));
       }
       async getFormTemplate(id, businessId) {
-        const [template] = await db.select().from(formTemplates).where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId)));
+        const [template] = await db.select().from(formTemplates).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(formTemplates.id, id), (0, import_drizzle_orm2.eq)(formTemplates.businessId, businessId)));
         return template;
       }
       async getFormTemplatesByWorkType(businessId, workType) {
         return db.select().from(formTemplates).where(
-          and(
-            eq(formTemplates.businessId, businessId),
-            eq(formTemplates.isActive, "true"),
-            or(eq(formTemplates.workType, workType), isNull(formTemplates.workType))
+          (0, import_drizzle_orm2.and)(
+            (0, import_drizzle_orm2.eq)(formTemplates.businessId, businessId),
+            (0, import_drizzle_orm2.eq)(formTemplates.isActive, "true"),
+            (0, import_drizzle_orm2.or)((0, import_drizzle_orm2.eq)(formTemplates.workType, workType), (0, import_drizzle_orm2.isNull)(formTemplates.workType))
           )
         );
       }
@@ -842,11 +864,11 @@ var init_storage = __esm({
         return template;
       }
       async updateFormTemplate(id, businessId, updates) {
-        const [template] = await db.update(formTemplates).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId))).returning();
+        const [template] = await db.update(formTemplates).set({ ...updates, updatedAt: /* @__PURE__ */ new Date() }).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(formTemplates.id, id), (0, import_drizzle_orm2.eq)(formTemplates.businessId, businessId))).returning();
         return template;
       }
       async deleteFormTemplate(id, businessId) {
-        const result = await db.delete(formTemplates).where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId)));
+        const result = await db.delete(formTemplates).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(formTemplates.id, id), (0, import_drizzle_orm2.eq)(formTemplates.businessId, businessId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
       // Form submission operations
@@ -858,7 +880,7 @@ var init_storage = __esm({
           responses: formSubmissions.responses,
           submittedAt: formSubmissions.submittedAt,
           template: formTemplates
-        }).from(formSubmissions).innerJoin(formTemplates, eq(formSubmissions.templateId, formTemplates.id)).where(eq(formSubmissions.workLogId, workLogId));
+        }).from(formSubmissions).innerJoin(formTemplates, (0, import_drizzle_orm2.eq)(formSubmissions.templateId, formTemplates.id)).where((0, import_drizzle_orm2.eq)(formSubmissions.workLogId, workLogId));
       }
       async createFormSubmission(submissionData) {
         const [submission] = await db.insert(formSubmissions).values(submissionData).returning();
@@ -866,18 +888,18 @@ var init_storage = __esm({
       }
       // Work log task operations
       async getWorkLogTasks(workLogId) {
-        return db.select().from(workLogTasks).where(eq(workLogTasks.workLogId, workLogId)).orderBy(workLogTasks.createdAt);
+        return db.select().from(workLogTasks).where((0, import_drizzle_orm2.eq)(workLogTasks.workLogId, workLogId)).orderBy(workLogTasks.createdAt);
       }
       async createWorkLogTask(taskData) {
         const [task] = await db.insert(workLogTasks).values(taskData).returning();
         return task;
       }
       async updateWorkLogTask(id, workLogId, updates) {
-        const [task] = await db.update(workLogTasks).set(updates).where(and(eq(workLogTasks.id, id), eq(workLogTasks.workLogId, workLogId))).returning();
+        const [task] = await db.update(workLogTasks).set(updates).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogTasks.id, id), (0, import_drizzle_orm2.eq)(workLogTasks.workLogId, workLogId))).returning();
         return task;
       }
       async deleteWorkLogTask(id, workLogId) {
-        const result = await db.delete(workLogTasks).where(and(eq(workLogTasks.id, id), eq(workLogTasks.workLogId, workLogId)));
+        const result = await db.delete(workLogTasks).where((0, import_drizzle_orm2.and)((0, import_drizzle_orm2.eq)(workLogTasks.id, id), (0, import_drizzle_orm2.eq)(workLogTasks.workLogId, workLogId)));
         return result.rowCount ? result.rowCount > 0 : true;
       }
     };
@@ -1119,10 +1141,8 @@ __export(googleCalendarService_exports, {
   syncJobToCalendar: () => syncJobToCalendar,
   updateCalendarEvent: () => updateCalendarEvent
 });
-import { google } from "googleapis";
-import { eq as eq2 } from "drizzle-orm";
 function createOAuth2Client() {
-  return new google.auth.OAuth2(
+  return new import_googleapis.google.auth.OAuth2(
     GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET,
     GOOGLE_REDIRECT_URI
@@ -1149,7 +1169,7 @@ async function refreshAccessToken(refreshToken) {
   return credentials;
 }
 async function getAuthenticatedClient(userId) {
-  const [user] = await db.select().from(users).where(eq2(users.id, userId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
   if (!user || !user.googleAccessToken) {
     throw new Error("User not connected to Google Calendar");
   }
@@ -1163,7 +1183,7 @@ async function getAuthenticatedClient(userId) {
         googleAccessToken: newTokens.access_token,
         googleTokenExpiresAt: newTokens.expiry_date ? new Date(newTokens.expiry_date).toISOString() : null,
         updatedAt: /* @__PURE__ */ new Date()
-      }).where(eq2(users.id, userId));
+      }).where((0, import_drizzle_orm3.eq)(users.id, userId));
       oauth2Client.setCredentials({
         access_token: newTokens.access_token,
         refresh_token: user.googleRefreshToken
@@ -1180,7 +1200,7 @@ async function getAuthenticatedClient(userId) {
       refresh_token: user.googleRefreshToken
     });
   }
-  return google.calendar({ version: "v3", auth: oauth2Client });
+  return import_googleapis.google.calendar({ version: "v3", auth: oauth2Client });
 }
 async function listCalendars(userId) {
   const calendar = await getAuthenticatedClient(userId);
@@ -1188,7 +1208,7 @@ async function listCalendars(userId) {
   return response.data.items || [];
 }
 async function createCalendarEvent(userId, workLog) {
-  const [user] = await db.select().from(users).where(eq2(users.id, userId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
   if (!user?.googleCalendarId) {
     throw new Error("No calendar selected for sync");
   }
@@ -1222,11 +1242,11 @@ ${workLog.additionalNotes || ""}`.trim(),
     googleCalendarEventId: response.data.id,
     googleCalendarSyncedAt: (/* @__PURE__ */ new Date()).toISOString(),
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq2(workLogs.id, workLog.id));
+  }).where((0, import_drizzle_orm3.eq)(workLogs.id, workLog.id));
   return response.data;
 }
 async function updateCalendarEvent(userId, eventId, workLog) {
-  const [user] = await db.select().from(users).where(eq2(users.id, userId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
   if (!user?.googleCalendarId) {
     throw new Error("No calendar selected for sync");
   }
@@ -1255,11 +1275,11 @@ ${workLog.additionalNotes || ""}`.trim(),
   await db.update(workLogs).set({
     googleCalendarSyncedAt: (/* @__PURE__ */ new Date()).toISOString(),
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq2(workLogs.id, workLog.id));
+  }).where((0, import_drizzle_orm3.eq)(workLogs.id, workLog.id));
   return response.data;
 }
 async function deleteCalendarEvent(userId, eventId, workLogId) {
-  const [user] = await db.select().from(users).where(eq2(users.id, userId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
   if (!user?.googleCalendarId) {
     return;
   }
@@ -1278,7 +1298,7 @@ async function deleteCalendarEvent(userId, eventId, workLogId) {
     googleCalendarEventId: null,
     googleCalendarSyncedAt: null,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq2(workLogs.id, workLogId));
+  }).where((0, import_drizzle_orm3.eq)(workLogs.id, workLogId));
 }
 async function syncJobToCalendar(userId, workLog) {
   if (!workLog.scheduledStartTime) {
@@ -1291,7 +1311,7 @@ async function syncJobToCalendar(userId, workLog) {
   }
 }
 async function importCalendarEvents(userId, businessId, technicianUserId, timeMin, timeMax) {
-  const [user] = await db.select().from(users).where(eq2(users.id, userId));
+  const [user] = await db.select().from(users).where((0, import_drizzle_orm3.eq)(users.id, userId));
   if (!user?.googleCalendarId) {
     throw new Error("No calendar selected for import");
   }
@@ -1363,17 +1383,19 @@ async function disconnectGoogleCalendar(userId) {
     googleTokenExpiresAt: null,
     googleCalendarId: null,
     updatedAt: /* @__PURE__ */ new Date()
-  }).where(eq2(users.id, userId));
+  }).where((0, import_drizzle_orm3.eq)(users.id, userId));
 }
 function isGoogleCalendarConfigured() {
   return !!(GOOGLE_CLIENT_ID && GOOGLE_CLIENT_SECRET);
 }
-var GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, SCOPES;
+var import_googleapis, import_drizzle_orm3, GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI, SCOPES;
 var init_googleCalendarService = __esm({
   "server/googleCalendarService.ts"() {
     "use strict";
+    import_googleapis = require("googleapis");
     init_db();
     init_schema();
+    import_drizzle_orm3 = require("drizzle-orm");
     GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
     GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
     GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || "http://localhost:5000/api/google/callback";
@@ -1385,18 +1407,23 @@ var init_googleCalendarService = __esm({
 });
 
 // api/index.ts
-import express from "express";
-import cookieParser from "cookie-parser";
+var index_exports = {};
+__export(index_exports, {
+  default: () => handler
+});
+module.exports = __toCommonJS(index_exports);
+var import_express = __toESM(require("express"), 1);
+var import_cookie_parser = __toESM(require("cookie-parser"), 1);
 
 // server/routes.ts
+var import_http = require("http");
 init_storage();
 init_schema();
-import { createServer } from "http";
 
 // server/supabaseStorage.ts
-import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "crypto";
-var supabase = createClient(
+var import_supabase_js = require("@supabase/supabase-js");
+var import_crypto2 = require("crypto");
+var supabase = (0, import_supabase_js.createClient)(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -1413,7 +1440,7 @@ var ObjectStorageService = class {
    * Returns a URL that accepts PUT requests with the file content
    */
   async getObjectEntityUploadURL() {
-    const objectId = randomUUID();
+    const objectId = (0, import_crypto2.randomUUID)();
     const filePath = `uploads/${objectId}`;
     const { data, error } = await supabase.storage.from(BUCKET_NAME).createSignedUploadUrl(filePath);
     if (error) {
@@ -1514,9 +1541,9 @@ var ObjectStorageService = class {
 var objectStorageService = new ObjectStorageService();
 
 // server/supabaseAuth.ts
+var import_supabase_js2 = require("@supabase/supabase-js");
 init_storage();
-import { createClient as createClient2 } from "@supabase/supabase-js";
-var supabase2 = createClient2(
+var supabase2 = (0, import_supabase_js2.createClient)(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
@@ -2843,15 +2870,15 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Internal server error" });
     }
   });
-  const httpServer = createServer(app2);
+  const httpServer = (0, import_http.createServer)(app2);
   return httpServer;
 }
 
 // api/index.ts
-var app = express();
-app.use(cookieParser());
-app.use(express.json());
-app.use(express.urlencoded({ extended: false }));
+var app = (0, import_express.default)();
+app.use((0, import_cookie_parser.default)());
+app.use(import_express.default.json());
+app.use(import_express.default.urlencoded({ extended: false }));
 var initialized = false;
 var initPromise = null;
 async function initializeApp() {
@@ -2867,6 +2894,3 @@ async function handler(req, res) {
   await initializeApp();
   return app(req, res);
 }
-export {
-  handler as default
-};
