@@ -925,13 +925,12 @@ var init_storage = __esm({
 // server/supabaseStorage.ts
 function getSupabase() {
   if (!_supabase) {
-    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+    if (!supabaseUrl || !supabaseKey) {
       throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
     }
-    _supabase = (0, import_supabase_js.createClient)(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    _supabase = (0, import_supabase_js.createClient)(supabaseUrl, supabaseKey);
   }
   return _supabase;
 }
@@ -1060,16 +1059,15 @@ var init_supabaseStorage = __esm({
 // server/supabaseAuth.ts
 function getSupabase2() {
   if (!_supabase2) {
-    if (!process.env.SUPABASE_URL) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+    if (!supabaseUrl) {
       throw new Error("SUPABASE_URL environment variable is not set");
     }
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (!supabaseKey) {
       throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is not set");
     }
-    _supabase2 = (0, import_supabase_js2.createClient)(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    _supabase2 = (0, import_supabase_js2.createClient)(supabaseUrl, supabaseKey);
   }
   return _supabase2;
 }
@@ -2978,4 +2976,3 @@ async function handler(req, res) {
     });
   }
 }
-// force rebuild Sun May 17 12:50:32 PDT 2026

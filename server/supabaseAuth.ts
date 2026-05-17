@@ -7,16 +7,16 @@ let _supabase: SupabaseClient | null = null;
 
 function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    if (!process.env.SUPABASE_URL) {
+    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+
+    if (!supabaseUrl) {
       throw new Error('SUPABASE_URL environment variable is not set');
     }
-    if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (!supabaseKey) {
       throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
     }
-    _supabase = createClient(
-      process.env.SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY
-    );
+    _supabase = createClient(supabaseUrl, supabaseKey);
   }
   return _supabase;
 }
