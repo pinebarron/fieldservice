@@ -2888,6 +2888,15 @@ var app = (0, import_express.default)();
 app.use((0, import_cookie_parser.default)());
 app.use(import_express.default.json());
 app.use(import_express.default.urlencoded({ extended: false }));
+app.get("/api/debug-env", (req, res) => {
+  res.json({
+    hasSupabaseUrl: !!process.env.SUPABASE_URL,
+    hasSupabaseAnon: !!process.env.SUPABASE_ANON_KEY,
+    hasSupabaseService: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+    hasDatabaseUrl: !!process.env.DATABASE_URL,
+    supabaseUrlPrefix: process.env.SUPABASE_URL?.substring(0, 20) || "NOT SET"
+  });
+});
 var initialized = false;
 var initPromise = null;
 async function initializeApp() {
@@ -2900,6 +2909,9 @@ async function initializeApp() {
   return initPromise;
 }
 async function handler(req, res) {
+  if (req.url === "/api/debug-env") {
+    return app(req, res);
+  }
   try {
     await initializeApp();
     return app(req, res);
