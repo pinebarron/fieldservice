@@ -1,13 +1,36 @@
-export default function handler(req, res) {
+import { createClient } from '@supabase/supabase-js';
+
+export default async function handler(req, res) {
   const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+  const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   res.setHeader('Content-Type', 'application/json');
-  res.end(JSON.stringify({
-    working: true,
-    supabaseUrl: supabaseUrl ? supabaseUrl.substring(0, 40) : 'NOT SET',
-    usingServiceRoleKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-    usingSecretKey: !!process.env.SUPABASE_SECRET_KEY,
-    keyPrefix: supabaseKey ? supabaseKey.substring(0, 15) + '...' : 'NOT SET'
-  }));
+
+  if (!supabaseUrl || !anonKey) {
+    return res.end(JSON.stringify({
+      error: 'Missing config',
+      hasUrl: !!supabaseUrl,
+      hasAnonKey: !!anonKey
+    }));
+  }
+
+  try {
+    const supabase = createClient(supabaseUrl, anonKey);
+
+    // Try a simple auth check
+    const { data, error } = await supabase.auth.getSession();
+
+    res.end(JSON.stringify({
+      working: true,
+      supabaseUrl: supabaseUrl,
+      anonKeyPrefix: anonKey.substring(0, 20) + '...',
+      sessionCheck: error ? error.message : 'OK',
+      errorCode: error?.code || null
+    }));
+  } catch (err) {
+    res.end(JSON.stringify({
+      error: 'Exception',
+      message: err.message
+    }));
+  }
 }
