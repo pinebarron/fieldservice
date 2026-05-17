@@ -10,6 +10,7 @@ interface MapPin {
 interface JobMapProps {
   workLogs: WorkLog[];
   height?: string;
+  className?: string;
   onPinClick?: (workLog: WorkLog) => void;
   singleJob?: boolean;
 }
@@ -58,7 +59,7 @@ async function geocodeAddress(city: string, state: string, zip: string): Promise
   return null;
 }
 
-export function JobMap({ workLogs, height = "320px", onPinClick, singleJob = false }: JobMapProps) {
+export function JobMap({ workLogs, height, className, onPinClick, singleJob = false }: JobMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
@@ -188,7 +189,10 @@ export function JobMap({ workLogs, height = "320px", onPinClick, singleJob = fal
   }, [workLogs, singleJob]);
 
   return (
-    <div className="relative rounded-lg overflow-hidden border border-border" style={{ height }}>
+    <div
+      className={`relative rounded-lg overflow-hidden border border-border ${className || ''}`}
+      style={height ? { height } : undefined}
+    >
       {status === "loading" && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-muted/80 gap-3">
           <div className="w-7 h-7 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>

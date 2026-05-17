@@ -6,11 +6,13 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: "fa-home" },
+  { href: "/schedule", label: "Schedule", icon: "fa-calendar-alt" },
   { href: "/properties", label: "Properties", icon: "fa-building" },
   { href: "/estimates", label: "Estimates", icon: "fa-file-invoice-dollar" },
   { href: "/team", label: "Team", icon: "fa-users" },
   { href: "/vendors", label: "Vendors", icon: "fa-handshake" },
   { href: "/pricing", label: "Pricing", icon: "fa-tag" },
+  { href: "/forms", label: "Forms", icon: "fa-file-alt" },
   { href: "/settings", label: "Settings", icon: "fa-cog" },
 ];
 

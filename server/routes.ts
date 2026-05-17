@@ -1,12 +1,12 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, updateBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema } from "@shared/schema";
-import { ObjectStorageService, ObjectNotFoundError } from "./objectStorage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { insertWorkLogSchema, updateWorkLogSchema, insertBusinessSchema, updateBusinessSchema, insertBusinessMemberSchema, insertVendorSchema, updateVendorSchema, insertPropertySchema, updatePropertySchema, insertPricingItemSchema, updatePricingItemSchema, insertEstimateSchema, updateEstimateSchema, insertEstimateLineItemSchema, insertRecurringScheduleSchema, updateRecurringScheduleSchema, workLogStatusSchema, insertFormTemplateSchema, updateFormTemplateSchema, insertFormSubmissionSchema, insertWorkLogTaskSchema, updateWorkLogTaskSchema } from "@shared/schema";
+import { objectStorageService, ObjectNotFoundError } from "./supabaseStorage";
+import { setupAuth, isAuthenticated } from "./supabaseAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  const objectStorageService = new ObjectStorageService();
+  // objectStorageService is imported as singleton from supabaseStorage
 
   // Setup authentication (from Replit Auth blueprint)
   await setupAuth(app);
@@ -613,12 +613,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Object Storage Routes
   app.get("/objects/:objectPath(*)", async (req, res) => {
     try {
-      const objectFile = await objectStorageService.getObjectEntityFile(
-        req.path,
-      );
-      objectStorageService.downloadObject(objectFile, res);
+      await objectStorageService.downloadObject(req.path, res);
     } catch (error) {
-      console.error("Error checking object access:", error);
+      console.error("Error downloading object:", error);
       if (error instanceof ObjectNotFoundError) {
         return res.sendStatus(404);
       }
@@ -652,6 +649,420 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error finalizing object:", error);
       res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Schedule Routes
+  app.get("/api/schedule/jobs", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.json([]);
+
+      const month = req.query.month as string;
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: "Invalid month format. Use YYYY-MM" });
+      }
+
+      const jobs = await storage.getScheduledJobs(business.id, month);
+      res.json(jobs);
+    } catch (error) {
+      console.error("Error fetching scheduled jobs:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/schedule/jobs", isAuthenticated, async (req: any, res) => {
+    console.log("POST /api/schedule/jobs called with body:", JSON.stringify(req.body, null, 2));
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) {
+        console.log("No business found for user:", userId);
+        return res.status(400).json({ error: "Business not found" });
+      }
+
+      console.log("Business found:", business.id);
+      const validatedData = insertWorkLogSchema.parse({
+        ...req.body,
+        businessId: business.id,
+        status: "scheduled",
+      });
+      console.log("Validated data:", JSON.stringify(validatedData, null, 2));
+      const workLog = await storage.createWorkLog(validatedData);
+      console.log("Work log created:", JSON.stringify(workLog, null, 2));
+      res.status(201).json(workLog);
+    } catch (error) {
+      console.error("Error creating scheduled job:", error);
+      res.status(400).json({ error: "Invalid job data" });
+    }
+  });
+
+  app.post("/api/work-logs/:id/start", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const workLog = await storage.getWorkLog(req.params.id, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      if (workLog.status !== "scheduled") {
+        return res.status(400).json({ error: "Can only start scheduled jobs" });
+      }
+
+      const updated = await storage.updateWorkLogStatus(req.params.id, business.id, "in-progress");
+      res.json(updated);
+    } catch (error) {
+      console.error("Error starting job:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/work-logs/:id/complete", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const workLog = await storage.getWorkLog(req.params.id, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      if (workLog.status !== "in-progress") {
+        return res.status(400).json({ error: "Can only complete in-progress jobs" });
+      }
+
+      const updated = await storage.updateWorkLogStatus(req.params.id, business.id, "completed");
+      res.json(updated);
+    } catch (error) {
+      console.error("Error completing job:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.patch("/api/work-logs/:id/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const { status } = req.body;
+      const parsedStatus = workLogStatusSchema.safeParse(status);
+      if (!parsedStatus.success) {
+        return res.status(400).json({ error: "Invalid status. Must be: scheduled, in-progress, completed, or cancelled" });
+      }
+
+      const workLog = await storage.getWorkLog(req.params.id, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      // Validate status transitions
+      const currentStatus = workLog.status;
+      const newStatus = parsedStatus.data;
+
+      const validTransitions: Record<string, string[]> = {
+        "scheduled": ["in-progress", "cancelled"],
+        "in-progress": ["completed", "cancelled"],
+        "completed": [], // Cannot transition from completed
+        "cancelled": ["scheduled"], // Can reschedule cancelled jobs
+      };
+
+      if (!validTransitions[currentStatus]?.includes(newStatus)) {
+        return res.status(400).json({
+          error: `Cannot transition from ${currentStatus} to ${newStatus}`
+        });
+      }
+
+      const updated = await storage.updateWorkLogStatus(req.params.id, business.id, newStatus);
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating job status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Recurring Schedule Routes
+  app.get("/api/recurring-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.json([]);
+
+      const schedules = await storage.getRecurringSchedules(business.id);
+      res.json(schedules);
+    } catch (error) {
+      console.error("Error fetching recurring schedules:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/recurring-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+
+      const schedule = await storage.getRecurringSchedule(req.params.id, business.id);
+      if (!schedule) return res.status(404).json({ error: "Not found" });
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error fetching recurring schedule:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/recurring-schedules", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      const validatedData = insertRecurringScheduleSchema.parse({
+        ...req.body,
+        businessId: business.id,
+      });
+      const schedule = await storage.createRecurringSchedule(validatedData);
+      res.status(201).json(schedule);
+    } catch (error) {
+      console.error("Error creating recurring schedule:", error);
+      res.status(400).json({ error: "Invalid recurring schedule data" });
+    }
+  });
+
+  app.patch("/api/recurring-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+
+      const validatedData = updateRecurringScheduleSchema.parse(req.body);
+      const schedule = await storage.updateRecurringSchedule(req.params.id, business.id, validatedData);
+      if (!schedule) return res.status(404).json({ error: "Not found" });
+      res.json(schedule);
+    } catch (error) {
+      console.error("Error updating recurring schedule:", error);
+      res.status(400).json({ error: "Invalid data" });
+    }
+  });
+
+  app.delete("/api/recurring-schedules/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Not found" });
+
+      const deleted = await storage.deleteRecurringSchedule(req.params.id, business.id);
+      if (!deleted) return res.status(404).json({ error: "Not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting recurring schedule:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/recurring-schedules/generate-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      const { generateRecurringJobs } = await import("./recurringJobService");
+      const generated = await generateRecurringJobs(business.id);
+      res.json({ generated: generated.length, jobs: generated });
+    } catch (error) {
+      console.error("Error generating recurring jobs:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Google Calendar Integration Routes
+  app.get("/api/google/status", isAuthenticated, async (req: any, res) => {
+    try {
+      const { isGoogleCalendarConfigured } = await import("./googleCalendarService");
+      const userId = req.user.claims.sub;
+      const user = await storage.getUser(userId);
+
+      res.json({
+        configured: isGoogleCalendarConfigured(),
+        connected: !!(user?.googleAccessToken),
+        calendarId: user?.googleCalendarId || null,
+      });
+    } catch (error) {
+      console.error("Error checking Google status:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/google/auth", isAuthenticated, async (req: any, res) => {
+    try {
+      const { isGoogleCalendarConfigured, getAuthUrl } = await import("./googleCalendarService");
+
+      if (!isGoogleCalendarConfigured()) {
+        return res.status(400).json({ error: "Google Calendar not configured" });
+      }
+
+      const userId = req.user.claims.sub;
+      const authUrl = getAuthUrl(userId);
+      res.json({ authUrl });
+    } catch (error) {
+      console.error("Error generating auth URL:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/google/callback", async (req: any, res) => {
+    try {
+      const { code, state } = req.query;
+      const userId = state as string;
+
+      if (!code || !userId) {
+        return res.redirect("/settings?google=error&message=missing_params");
+      }
+
+      const { exchangeCodeForTokens } = await import("./googleCalendarService");
+      const tokens = await exchangeCodeForTokens(code as string);
+
+      // Save tokens to user
+      const { users } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+
+      await db.update(users).set({
+        googleAccessToken: tokens.access_token,
+        googleRefreshToken: tokens.refresh_token,
+        googleTokenExpiresAt: tokens.expiry_date ? new Date(tokens.expiry_date).toISOString() : null,
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
+
+      res.redirect("/settings?google=success");
+    } catch (error) {
+      console.error("Error in Google callback:", error);
+      res.redirect("/settings?google=error&message=auth_failed");
+    }
+  });
+
+  app.get("/api/google/calendars", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { listCalendars } = await import("./googleCalendarService");
+      const calendars = await listCalendars(userId);
+      res.json(calendars);
+    } catch (error: any) {
+      console.error("Error listing calendars:", error);
+      if (error.message === "User not connected to Google Calendar") {
+        return res.status(401).json({ error: "Not connected to Google Calendar" });
+      }
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/google/calendar", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { calendarId } = req.body;
+
+      if (!calendarId) {
+        return res.status(400).json({ error: "calendarId is required" });
+      }
+
+      const { users } = await import("@shared/schema");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+
+      await db.update(users).set({
+        googleCalendarId: calendarId,
+        updatedAt: new Date(),
+      }).where(eq(users.id, userId));
+
+      res.json({ success: true, calendarId });
+    } catch (error) {
+      console.error("Error setting calendar:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/google/disconnect", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { disconnectGoogleCalendar } = await import("./googleCalendarService");
+      await disconnectGoogleCalendar(userId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error disconnecting Google:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/google/sync-job/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const workLog = await storage.getWorkLog(req.params.id, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const { syncJobToCalendar } = await import("./googleCalendarService");
+      const event = await syncJobToCalendar(userId, workLog as any);
+      res.json({ success: true, event });
+    } catch (error: any) {
+      console.error("Error syncing job to calendar:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  app.post("/api/google/sync-all", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      const { month } = req.body;
+      if (!month) {
+        return res.status(400).json({ error: "month is required (YYYY-MM format)" });
+      }
+
+      const jobs = await storage.getScheduledJobs(business.id, month);
+      const { syncJobToCalendar } = await import("./googleCalendarService");
+
+      let synced = 0;
+      const errors: string[] = [];
+
+      for (const job of jobs) {
+        if (job.scheduledStartTime) {
+          try {
+            await syncJobToCalendar(userId, job as any);
+            synced++;
+          } catch (err: any) {
+            errors.push(`Job ${job.id}: ${err.message}`);
+          }
+        }
+      }
+
+      res.json({ synced, total: jobs.length, errors });
+    } catch (error: any) {
+      console.error("Error syncing all jobs:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
+    }
+  });
+
+  app.post("/api/google/import", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      const { timeMin, timeMax } = req.body;
+      if (!timeMin || !timeMax) {
+        return res.status(400).json({ error: "timeMin and timeMax are required" });
+      }
+
+      const { importCalendarEvents } = await import("./googleCalendarService");
+      const imported = await importCalendarEvents(userId, business.id, userId, timeMin, timeMax);
+
+      res.json({ imported: imported.length, jobs: imported });
+    } catch (error: any) {
+      console.error("Error importing calendar events:", error);
+      res.status(500).json({ error: error.message || "Internal server error" });
     }
   });
 
@@ -695,6 +1106,255 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error) {
       console.error("Error fetching stats:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // =====================================================
+  // Form Template Routes
+  // =====================================================
+
+  app.get("/api/form-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.json([]);
+
+      const templates = await storage.getFormTemplates(business.id);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching form templates:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/form-templates/by-work-type/:workType", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.json([]);
+
+      const templates = await storage.getFormTemplatesByWorkType(business.id, req.params.workType);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching form templates:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.get("/api/form-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const template = await storage.getFormTemplate(req.params.id, business.id);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+
+      res.json(template);
+    } catch (error) {
+      console.error("Error fetching form template:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/form-templates", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      const validatedData = insertFormTemplateSchema.parse({
+        ...req.body,
+        businessId: business.id,
+      });
+      const template = await storage.createFormTemplate(validatedData);
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating form template:", error);
+      res.status(400).json({ error: "Invalid template data" });
+    }
+  });
+
+  app.patch("/api/form-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const validatedData = updateFormTemplateSchema.parse(req.body);
+      const template = await storage.updateFormTemplate(req.params.id, business.id, validatedData);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating form template:", error);
+      res.status(400).json({ error: "Invalid update data" });
+    }
+  });
+
+  app.delete("/api/form-templates/:id", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      const deleted = await storage.deleteFormTemplate(req.params.id, business.id);
+      if (!deleted) return res.status(404).json({ error: "Template not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting form template:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // =====================================================
+  // Form Submission Routes
+  // =====================================================
+
+  app.get("/api/work-logs/:workLogId/forms", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.json([]);
+
+      // Verify work log belongs to business
+      const workLog = await storage.getWorkLog(req.params.workLogId, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const submissions = await storage.getFormSubmissions(req.params.workLogId);
+      res.json(submissions);
+    } catch (error) {
+      console.error("Error fetching form submissions:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/work-logs/:workLogId/forms", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      // Verify work log belongs to business
+      const workLog = await storage.getWorkLog(req.params.workLogId, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const validatedData = insertFormSubmissionSchema.parse({
+        ...req.body,
+        workLogId: req.params.workLogId,
+      });
+
+      const submission = await storage.createFormSubmission(validatedData);
+
+      // Create auto-tasks if any
+      if (req.body.tasksToCreate && Array.isArray(req.body.tasksToCreate)) {
+        for (const task of req.body.tasksToCreate) {
+          await storage.createWorkLogTask({
+            workLogId: req.params.workLogId,
+            title: task.title,
+            description: task.description,
+            createdFromForm: submission.id,
+          });
+        }
+      }
+
+      res.status(201).json(submission);
+    } catch (error) {
+      console.error("Error creating form submission:", error);
+      res.status(400).json({ error: "Invalid submission data" });
+    }
+  });
+
+  // =====================================================
+  // Work Log Task Routes
+  // =====================================================
+
+  app.get("/api/work-logs/:workLogId/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.json([]);
+
+      // Verify work log belongs to business
+      const workLog = await storage.getWorkLog(req.params.workLogId, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const tasks = await storage.getWorkLogTasks(req.params.workLogId);
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  app.post("/api/work-logs/:workLogId/tasks", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(400).json({ error: "Business not found" });
+
+      // Verify work log belongs to business
+      const workLog = await storage.getWorkLog(req.params.workLogId, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const validatedData = insertWorkLogTaskSchema.parse({
+        ...req.body,
+        workLogId: req.params.workLogId,
+      });
+
+      const task = await storage.createWorkLogTask(validatedData);
+      res.status(201).json(task);
+    } catch (error) {
+      console.error("Error creating task:", error);
+      res.status(400).json({ error: "Invalid task data" });
+    }
+  });
+
+  app.patch("/api/work-logs/:workLogId/tasks/:taskId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      // Verify work log belongs to business
+      const workLog = await storage.getWorkLog(req.params.workLogId, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const validatedData = updateWorkLogTaskSchema.parse(req.body);
+
+      // Add completedAt if status is changing to completed
+      if (validatedData.status === "completed") {
+        (validatedData as any).completedAt = new Date();
+      }
+
+      const task = await storage.updateWorkLogTask(req.params.taskId, req.params.workLogId, validatedData);
+      if (!task) return res.status(404).json({ error: "Task not found" });
+
+      res.json(task);
+    } catch (error) {
+      console.error("Error updating task:", error);
+      res.status(400).json({ error: "Invalid update data" });
+    }
+  });
+
+  app.delete("/api/work-logs/:workLogId/tasks/:taskId", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const business = await storage.getBusinessByUserId(userId);
+      if (!business) return res.status(404).json({ error: "Business not found" });
+
+      // Verify work log belongs to business
+      const workLog = await storage.getWorkLog(req.params.workLogId, business.id);
+      if (!workLog) return res.status(404).json({ error: "Work log not found" });
+
+      const deleted = await storage.deleteWorkLogTask(req.params.taskId, req.params.workLogId);
+      if (!deleted) return res.status(404).json({ error: "Task not found" });
+
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting task:", error);
       res.status(500).json({ error: "Internal server error" });
     }
   });

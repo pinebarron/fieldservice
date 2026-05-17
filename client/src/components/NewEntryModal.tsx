@@ -2,16 +2,18 @@ import { useState, useEffect, useRef } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type Property, type User, type BusinessMember, type PhotoMeta } from "@shared/schema";
+import { insertWorkLogSchema, type InsertWorkLog, type WorkLog, type Property, type User, type BusinessMember, type PhotoMeta, type FormTemplate, type FormSchema, type FormLogicRule } from "@shared/schema";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
 import { ObjectUploader } from "@/components/ObjectUploader";
+import { DynamicForm } from "@/components/DynamicForm";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import type { UploadResult } from "@uppy/core";
 
@@ -47,9 +49,18 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
   const cameraZoneRef = useRef<PhotoMeta["type"]>("general");
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [cameraUploading, setCameraUploading] = useState(false);
+  const [formResponses, setFormResponses] = useState<Record<string, Record<string, unknown>>>({});
+  const [pendingTasks, setPendingTasks] = useState<Array<{ templateId: string; title: string; description?: string }>>([]);
+  const [selectedTemplateIds, setSelectedTemplateIds] = useState<string[]>([]);
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
+    enabled: isOpen,
+  });
+
+  // Fetch form templates
+  const { data: formTemplates = [] } = useQuery<FormTemplate[]>({
+    queryKey: ["/api/form-templates"],
     enabled: isOpen,
   });
 
@@ -135,6 +146,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
       setGpsCoords(null);
       setGpsStatus("idle");
       setGpsAddress(null);
+      setFormResponses({});
+      setPendingTasks([]);
+      setSelectedTemplateIds([]);
     }
   }, [editWorkLog, isOpen, prefillProperty, form, user]);
 
@@ -154,7 +168,25 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
         return response.json();
       }
     },
-    onSuccess: () => {
+    onSuccess: async (createdWorkLog: { id: string }) => {
+      // Save form submissions for attached checklists (only for new entries)
+      if (!isEditMode) {
+        for (const templateId of selectedTemplateIds) {
+          const responses = formResponses[templateId];
+          if (responses && Object.keys(responses).length > 0) {
+            try {
+              await apiRequest("POST", `/api/work-logs/${createdWorkLog.id}/forms`, {
+                templateId,
+                responses,
+                tasksToCreate: pendingTasks.filter(t => t.templateId === templateId),
+              });
+            } catch (err) {
+              console.error("Failed to save form submission:", err);
+            }
+          }
+        }
+      }
+
       toast({
         title: "Success",
         description: isEditMode ? "Work log updated successfully" : "Work log entry created successfully",
@@ -216,6 +248,9 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
     setPropertyPickerOpen(false);
     setPropertySearch("");
     setSelectedTechnicianIds(user?.id ? [user.id] : []);
+    setFormResponses({});
+    setPendingTasks([]);
+    setSelectedTemplateIds([]);
     onClose();
   };
 
@@ -355,7 +390,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-full sm:max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Work Log Entry" : "Create New Work Log Entry"}</DialogTitle>
         </DialogHeader>
@@ -589,7 +624,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                   <label className="text-sm font-medium text-foreground">
                     Technicians * <span className="text-muted-foreground font-normal">(select all who worked on this job)</span>
                   </label>
-                  <div className="border border-border rounded-md divide-y divide-border overflow-hidden max-h-48 overflow-y-auto" data-testid="technician-multiselect">
+                  <div className="border border-border rounded-md divide-y divide-border overflow-hidden max-h-60 sm:max-h-48 overflow-y-auto" data-testid="technician-multiselect">
                     {members.map((member) => {
                       const isSelected = selectedTechnicianIds.includes(member.userId);
                       const isLead = selectedTechnicianIds[0] === member.userId;
@@ -598,7 +633,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                           key={member.userId}
                           type="button"
                           onClick={() => toggleTechnician(member.userId)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm text-left transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted"}`}
+                          className={`w-full flex items-center gap-3 px-3 py-3 sm:py-2.5 text-sm text-left transition-colors ${isSelected ? "bg-primary/5" : "hover:bg-muted"}`}
                           data-testid={`technician-option-${member.userId}`}
                         >
                           <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${isSelected ? "bg-primary border-primary" : "border-border"}`}>
@@ -685,6 +720,114 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                 />
               </div>
             </div>
+
+            {/* Dynamic Form Templates Section */}
+            {formTemplates.filter(t => t.isActive === "true").length > 0 && (
+              <div className="mt-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <i className="fas fa-clipboard-list text-primary"></i>
+                    Checklists
+                  </h4>
+                  <Select
+                    onValueChange={(templateId) => {
+                      if (templateId && !selectedTemplateIds.includes(templateId)) {
+                        setSelectedTemplateIds(prev => [...prev, templateId]);
+                      }
+                    }}
+                    value=""
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue placeholder="+ Add Checklist" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formTemplates
+                        .filter(t => t.isActive === "true" && !selectedTemplateIds.includes(t.id))
+                        .map(template => (
+                          <SelectItem key={template.id} value={template.id}>
+                            {template.name}
+                          </SelectItem>
+                        ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedTemplateIds.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No checklists attached. Use "Add Checklist" to attach one.
+                  </p>
+                ) : (
+                  <div className="space-y-4">
+                    {selectedTemplateIds.map(templateId => {
+                      const template = formTemplates.find(t => t.id === templateId);
+                      if (!template) return null;
+                      return (
+                        <Card key={template.id}>
+                          <CardHeader className="py-3 flex flex-row items-center justify-between">
+                            <CardTitle className="text-base flex items-center gap-2">
+                              <i className="fas fa-file-alt text-muted-foreground"></i>
+                              {template.name}
+                            </CardTitle>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => {
+                                setSelectedTemplateIds(prev => prev.filter(id => id !== templateId));
+                                setFormResponses(prev => {
+                                  const next = { ...prev };
+                                  delete next[templateId];
+                                  return next;
+                                });
+                              }}
+                            >
+                              <i className="fas fa-times"></i>
+                            </Button>
+                          </CardHeader>
+                          <CardContent>
+                            <DynamicForm
+                              schema={template.schema as FormSchema}
+                              logicRules={(template.logicRules as FormLogicRule[]) || []}
+                              initialValues={formResponses[template.id] || {}}
+                              onSubmit={({ values, tasksToCreate }) => {
+                                setFormResponses(prev => ({ ...prev, [template.id]: values }));
+                                setPendingTasks(prev => [
+                                  ...prev.filter(t => t.templateId !== template.id),
+                                  ...tasksToCreate.map(task => ({ templateId: template.id, ...task }))
+                                ]);
+                              }}
+                              submitLabel="Save Checklist"
+                            />
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {pendingTasks.length > 0 && (
+                  <Card className="mt-4 border-amber-200 bg-amber-50 dark:bg-amber-950/20">
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <i className="fas fa-tasks text-amber-600"></i>
+                        Follow-up Tasks ({pendingTasks.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <ul className="space-y-1">
+                        {pendingTasks.map((task, index) => (
+                          <li key={index} className="text-sm flex items-start gap-2">
+                            <i className="fas fa-check-circle text-amber-600 mt-0.5"></i>
+                            <span>{task.title}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
 
             {/* File Upload Section */}
             <div>
@@ -810,7 +953,7 @@ export function NewEntryModal({ isOpen, onClose, onSuccess, editWorkLog, prefill
                               type="button"
                               onClick={() => openCamera(type)}
                               disabled={cameraUploading}
-                              className="w-full flex items-center justify-center gap-2 py-2 px-3 rounded-lg border-2 border-dashed border-current/40 text-xs font-semibold transition-colors bg-white/60 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 active:scale-95"
+                              className="w-full flex items-center justify-center gap-2 py-3 sm:py-2 px-3 rounded-lg border-2 border-dashed border-current/40 text-sm sm:text-xs font-semibold transition-colors bg-white/60 dark:bg-black/20 hover:bg-white dark:hover:bg-black/40 active:scale-95 min-h-[44px]"
                               style={{ color: header.replace("bg-", "").includes("amber") ? "#d97706" : header.replace("bg-", "").includes("blue") ? "#2563eb" : "#16a34a" }}
                               data-testid={`button-camera-${type}`}
                             >

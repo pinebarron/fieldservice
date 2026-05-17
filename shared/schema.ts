@@ -3,6 +3,17 @@ import { pgTable, text, varchar, timestamp, json, index } from "drizzle-orm/pg-c
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Annotation type for photo markup
+export type PhotoAnnotation = {
+  id: string;
+  type: "arrow" | "circle" | "rectangle" | "text" | "freehand";
+  coordinates: number[]; // [x1, y1, x2, y2] or path points for freehand
+  color: string;
+  strokeWidth: number;
+  text?: string;
+  fontSize?: number;
+};
+
 // Photo metadata type for GPS-tagged images
 export type PhotoMeta = {
   url: string;
@@ -12,6 +23,54 @@ export type PhotoMeta = {
   address?: string;
   capturedAt: string;
   technicianName?: string;
+  annotations?: PhotoAnnotation[];
+};
+
+// Form field types for dynamic forms
+export type FormFieldType =
+  | "text" | "textarea" | "number" | "date" | "time"
+  | "select" | "multiselect" | "checkbox" | "radio"
+  | "photo" | "signature" | "gps";
+
+// Form field definition
+export type FormFieldDefinition = {
+  id: string;
+  type: FormFieldType;
+  label: string;
+  placeholder?: string;
+  required?: boolean;
+  options?: { label: string; value: string }[]; // for select/radio/checkbox
+  validation?: {
+    min?: number;
+    max?: number;
+    minLength?: number;
+    maxLength?: number;
+    pattern?: string;
+  };
+};
+
+// Logic rule for conditional form behavior
+export type FormLogicRule = {
+  id: string;
+  condition: {
+    field: string;
+    operator: "equals" | "not_equals" | "contains" | "greater_than" | "less_than" | "is_empty" | "is_not_empty";
+    value?: string | number | boolean;
+  };
+  action: {
+    type: "show" | "hide" | "require" | "unrequire" | "create_task";
+    target: string; // field id or task template name
+    taskDetails?: {
+      title: string;
+      description?: string;
+    };
+  };
+};
+
+// Form schema structure
+export type FormSchema = {
+  fields: FormFieldDefinition[];
+  sections?: { id: string; title: string; fieldIds: string[] }[];
 };
 
 // Session storage table (required for Replit Auth)
@@ -32,6 +91,11 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  // Google Calendar OAuth tokens
+  googleAccessToken: text("google_access_token"),
+  googleRefreshToken: text("google_refresh_token"),
+  googleTokenExpiresAt: text("google_token_expires_at"),
+  googleCalendarId: text("google_calendar_id"), // Selected calendar to sync with
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -156,6 +220,41 @@ export const apiClients = pgTable("api_clients", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+// Recurring schedules table (templates for generating recurring jobs)
+export const recurringSchedules = pgTable("recurring_schedules", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  propertyId: varchar("property_id").references(() => properties.id),
+  // Job details
+  customerName: text("customer_name").notNull(),
+  workType: text("work_type").notNull(),
+  locationName: text("location_name").notNull(),
+  city: text("city").notNull(),
+  state: text("state").notNull(),
+  zipCode: text("zip_code").notNull(),
+  workDescription: text("work_description").notNull(),
+  notes: text("notes"),
+  // Assigned technicians
+  technicianUserIds: json("technician_user_ids").$type<string[]>().default([]),
+  // Schedule time (HH:mm format)
+  scheduledTime: text("scheduled_time").notNull(),
+  estimatedDurationMinutes: text("estimated_duration_minutes").default("60"),
+  // Recurrence pattern
+  frequency: text("frequency").notNull(), // daily, weekly, monthly
+  interval: text("interval").notNull().default("1"), // every N days/weeks/months
+  daysOfWeek: json("days_of_week").$type<number[]>().default([]), // 0=Sunday, 6=Saturday (for weekly)
+  dayOfMonth: text("day_of_month"), // 1-31 or "last" (for monthly)
+  // Date range
+  startDate: text("start_date").notNull(), // YYYY-MM-DD
+  endDate: text("end_date"), // YYYY-MM-DD (optional)
+  maxOccurrences: text("max_occurrences"), // optional limit
+  // State
+  isActive: text("is_active").notNull().default("true"),
+  lastGeneratedDate: text("last_generated_date"), // YYYY-MM-DD
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
 // Work logs table
 export const workLogs = pgTable("work_logs", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -173,7 +272,7 @@ export const workLogs = pgTable("work_logs", {
   endTime: text("end_time"),
   workPerformed: text("work_performed").notNull(),
   additionalNotes: text("additional_notes"),
-  status: text("status").notNull().default("completed"),
+  status: text("status").notNull().default("completed"), // scheduled, in-progress, completed, cancelled
   technicianUserIds: json("technician_user_ids").$type<string[]>().default([]),
   imageUrls: json("image_urls").$type<string[]>().default([]),
   pdfUrls: json("pdf_urls").$type<string[]>().default([]),
@@ -184,8 +283,55 @@ export const workLogs = pgTable("work_logs", {
   checkInLng: text("check_in_lng"),
   checkOutLat: text("check_out_lat"),
   checkOutLng: text("check_out_lng"),
+  // Scheduling fields
+  scheduledStartTime: text("scheduled_start_time"), // ISO datetime for scheduled start
+  scheduledEndTime: text("scheduled_end_time"), // ISO datetime for scheduled end
+  recurringScheduleId: varchar("recurring_schedule_id").references(() => recurringSchedules.id),
+  isRecurrenceInstance: text("is_recurrence_instance").default("false"), // flag for auto-generated jobs
+  // Google Calendar integration
+  googleCalendarEventId: text("google_calendar_event_id"),
+  googleCalendarSyncedAt: text("google_calendar_synced_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Form templates table (dynamic conditional forms)
+export const formTemplates = pgTable("form_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  businessId: varchar("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  description: text("description"),
+  workType: text("work_type"), // linked to specific work type or null for all
+  schema: json("schema").$type<FormSchema>().notNull(),
+  logicRules: json("logic_rules").$type<FormLogicRule[]>().default([]),
+  isActive: text("is_active").notNull().default("true"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+// Form submissions (linked to work logs)
+export const formSubmissions = pgTable("form_submissions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workLogId: varchar("work_log_id").notNull().references(() => workLogs.id),
+  templateId: varchar("template_id").notNull().references(() => formTemplates.id),
+  responses: json("responses").$type<Record<string, unknown>>().notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+});
+
+// Work log tasks (sub-tasks created from forms or manually)
+export const workLogTasks = pgTable("work_log_tasks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  workLogId: varchar("work_log_id").notNull().references(() => workLogs.id),
+  parentTaskId: varchar("parent_task_id").references((): any => workLogTasks.id),
+  title: text("title").notNull(),
+  description: text("description"),
+  status: text("status").notNull().default("pending"), // pending, in_progress, completed, cancelled
+  priority: text("priority").default("normal"), // low, normal, high, urgent
+  assignedUserId: varchar("assigned_user_id").references(() => users.id),
+  dueDate: text("due_date"),
+  createdFromForm: varchar("created_from_form").references(() => formSubmissions.id),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
 });
 
 // Zod schemas
@@ -250,6 +396,40 @@ export const insertWorkLogSchema = createInsertSchema(workLogs).omit({
 });
 export const updateWorkLogSchema = insertWorkLogSchema.partial();
 
+export const insertRecurringScheduleSchema = createInsertSchema(recurringSchedules).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateRecurringScheduleSchema = insertRecurringScheduleSchema.partial();
+
+export const insertFormTemplateSchema = createInsertSchema(formTemplates).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+export const updateFormTemplateSchema = insertFormTemplateSchema.partial();
+
+export const insertFormSubmissionSchema = createInsertSchema(formSubmissions).omit({
+  id: true,
+  submittedAt: true,
+});
+
+export const insertWorkLogTaskSchema = createInsertSchema(workLogTasks).omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+export const updateWorkLogTaskSchema = insertWorkLogTaskSchema.partial();
+
+// Work log status enum for type safety
+export const workLogStatusSchema = z.enum(["scheduled", "in-progress", "completed", "cancelled"]);
+export type WorkLogStatus = z.infer<typeof workLogStatusSchema>;
+
+// Recurrence frequency enum
+export const recurrenceFrequencySchema = z.enum(["daily", "weekly", "monthly"]);
+export type RecurrenceFrequency = z.infer<typeof recurrenceFrequencySchema>;
+
 // TypeScript types
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
 export type User = typeof users.$inferSelect;
@@ -277,3 +457,18 @@ export type ApiClient = typeof apiClients.$inferSelect;
 export type WorkLog = typeof workLogs.$inferSelect;
 export type InsertWorkLog = z.infer<typeof insertWorkLogSchema>;
 export type UpdateWorkLog = z.infer<typeof updateWorkLogSchema>;
+export type RecurringSchedule = typeof recurringSchedules.$inferSelect;
+export type InsertRecurringSchedule = z.infer<typeof insertRecurringScheduleSchema>;
+export type UpdateRecurringSchedule = z.infer<typeof updateRecurringScheduleSchema>;
+export type FormTemplate = typeof formTemplates.$inferSelect;
+export type InsertFormTemplate = z.infer<typeof insertFormTemplateSchema>;
+export type UpdateFormTemplate = z.infer<typeof updateFormTemplateSchema>;
+export type FormSubmission = typeof formSubmissions.$inferSelect;
+export type InsertFormSubmission = z.infer<typeof insertFormSubmissionSchema>;
+export type WorkLogTask = typeof workLogTasks.$inferSelect;
+export type InsertWorkLogTask = z.infer<typeof insertWorkLogTaskSchema>;
+export type UpdateWorkLogTask = z.infer<typeof updateWorkLogTaskSchema>;
+
+// Task status enum
+export const taskStatusSchema = z.enum(["pending", "in_progress", "completed", "cancelled"]);
+export type TaskStatus = z.infer<typeof taskStatusSchema>;

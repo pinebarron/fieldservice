@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { type WorkLog, type PhotoMeta, type BusinessMember, type User } from "@shared/schema";
+import { type WorkLog, type PhotoMeta, type BusinessMember, type User, type FormSubmission, type FormTemplate, type FormSchema } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { pdf } from "@react-pdf/renderer";
 import { WorkReportPDF } from "@/components/WorkReportPDF";
@@ -50,6 +51,11 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
 
   const { data: members = [] } = useQuery<(BusinessMember & { user: User })[]>({
     queryKey: ["/api/business/members"],
+    enabled: isOpen,
+  });
+
+  const { data: formSubmissions = [] } = useQuery<(FormSubmission & { template: FormTemplate })[]>({
+    queryKey: [`/api/work-logs/${wl.id}/forms`],
     enabled: isOpen,
   });
 
@@ -210,7 +216,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-full sm:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex flex-col gap-2">
             <span data-testid="detail-job-title">{wl.customerName}</span>
@@ -261,7 +267,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                 {wl.locationName}<br />
                 {wl.city}, {wl.state} {wl.zipCode}
               </p>
-              <JobMap workLogs={[wl]} height="200px" singleJob />
+              <JobMap workLogs={[wl]} className="h-40 sm:h-48 md:h-52" singleJob />
             </div>
             <div>
               <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Work Type</h4>
@@ -390,6 +396,59 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
             </div>
           </div>
 
+          {/* Completed Checklists */}
+          {formSubmissions.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                <i className="fas fa-clipboard-check mr-2"></i>
+                Completed Checklists ({formSubmissions.length})
+              </h4>
+              <div className="space-y-3">
+                {formSubmissions.map((submission) => {
+                  const schema = submission.template.schema as FormSchema;
+                  const responses = submission.responses as Record<string, unknown>;
+
+                  return (
+                    <Card key={submission.id}>
+                      <CardHeader className="py-3">
+                        <CardTitle className="text-sm flex items-center gap-2">
+                          <i className="fas fa-file-alt text-primary"></i>
+                          {submission.template.name}
+                          <span className="text-xs font-normal text-muted-foreground ml-auto">
+                            {submission.submittedAt && new Date(submission.submittedAt).toLocaleString()}
+                          </span>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-2">
+                          {schema.fields?.map((field) => {
+                            const value = responses[field.id];
+                            if (value === undefined || value === null || value === "") return null;
+
+                            return (
+                              <div key={field.id} className="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-3 py-1 border-b border-border last:border-0">
+                                <span className="text-sm font-medium text-muted-foreground min-w-[140px]">
+                                  {field.label}:
+                                </span>
+                                <span className="text-sm text-foreground">
+                                  {typeof value === "boolean"
+                                    ? (value ? "Yes" : "No")
+                                    : Array.isArray(value)
+                                    ? value.join(", ")
+                                    : String(value)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Images Gallery — grouped by Before / During / After */}
           {wl.imageUrls && wl.imageUrls.length > 0 && (() => {
             const meta: PhotoMeta[] = wl.photoMetadata || [];
@@ -428,7 +487,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                             <span className="text-white/80 text-xs">{zonePhotos.length} photo{zonePhotos.length !== 1 ? "s" : ""}</span>
                           </div>
                           <div className={`${bg} p-3`}>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                               {zonePhotos.map((p) => (
                                 <div
                                   key={p.originalIndex}
@@ -450,7 +509,7 @@ export function DetailJobModal({ workLog, isOpen, onClose, onOpenLightbox, onRef
                     })}
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {allPhotos.map((p) => (
                       <div
                         key={p.originalIndex}

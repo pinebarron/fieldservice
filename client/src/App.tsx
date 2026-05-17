@@ -10,6 +10,7 @@ import { Landing } from "@/pages/Landing";
 import { BusinessOnboarding } from "@/pages/BusinessOnboarding";
 import { TeamManagement } from "@/pages/TeamManagement";
 import Dashboard from "@/pages/dashboard";
+import Schedule from "@/pages/Schedule";
 import Properties from "@/pages/Properties";
 import PropertyDetail from "@/pages/PropertyDetail";
 import Vendors from "@/pages/Vendors";
@@ -17,6 +18,7 @@ import Estimates from "@/pages/Estimates";
 import EstimateDetail from "@/pages/EstimateDetail";
 import PricingCatalog from "@/pages/PricingCatalog";
 import Settings from "@/pages/Settings";
+import FormTemplates from "@/pages/FormTemplates";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -49,6 +51,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Dashboard} />
+      <Route path="/schedule" component={Schedule} />
       <Route path="/properties" component={Properties} />
       <Route path="/properties/:id" component={PropertyDetail} />
       <Route path="/team" component={TeamManagement} />
@@ -57,6 +60,7 @@ function Router() {
       <Route path="/estimates" component={Estimates} />
       <Route path="/estimates/:id" component={EstimateDetail} />
       <Route path="/pricing" component={PricingCatalog} />
+      <Route path="/forms" component={FormTemplates} />
       <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>

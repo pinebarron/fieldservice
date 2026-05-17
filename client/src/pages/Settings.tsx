@@ -417,11 +417,278 @@ export default function Settings() {
           </Button>
         </div>
 
+        {/* Google Calendar Integration */}
+        {isOwner && <GoogleCalendarSection />}
+
         {/* Developer API section — only visible to owner */}
         {isOwner && <DeveloperApiSection businessId={business?.id} />}
 
       </main>
     </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────
+// Google Calendar Integration section
+// ────────────────────────────────────────────────────────────
+function GoogleCalendarSection() {
+  const { toast } = useToast();
+  const [calendars, setCalendars] = useState<any[]>([]);
+  const [loadingCalendars, setLoadingCalendars] = useState(false);
+
+  const { data: status, isLoading, refetch } = useQuery<{
+    configured: boolean;
+    connected: boolean;
+    calendarId: string | null;
+  }>({
+    queryKey: ["/api/google/status"],
+  });
+
+  // Check for OAuth callback result
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleResult = params.get("google");
+    if (googleResult === "success") {
+      toast({ title: "Connected", description: "Google Calendar connected successfully." });
+      refetch();
+      // Clean up URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else if (googleResult === "error") {
+      toast({ title: "Connection Failed", description: params.get("message") || "Could not connect to Google Calendar.", variant: "destructive" });
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [toast, refetch]);
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("GET", "/api/google/auth");
+      const { authUrl } = await res.json();
+      window.location.href = authUrl;
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not start Google authentication.", variant: "destructive" });
+    },
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest("POST", "/api/google/disconnect");
+    },
+    onSuccess: () => {
+      toast({ title: "Disconnected", description: "Google Calendar disconnected." });
+      refetch();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not disconnect.", variant: "destructive" });
+    },
+  });
+
+  const selectCalendarMutation = useMutation({
+    mutationFn: async (calendarId: string) => {
+      await apiRequest("POST", "/api/google/calendar", { calendarId });
+    },
+    onSuccess: () => {
+      toast({ title: "Calendar Selected", description: "Jobs will sync to this calendar." });
+      refetch();
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Could not set calendar.", variant: "destructive" });
+    },
+  });
+
+  const loadCalendars = async () => {
+    setLoadingCalendars(true);
+    try {
+      const res = await fetch("/api/google/calendars", { credentials: "include" });
+      if (res.ok) {
+        const data = await res.json();
+        setCalendars(data);
+      }
+    } catch (error) {
+      console.error("Error loading calendars:", error);
+    } finally {
+      setLoadingCalendars(false);
+    }
+  };
+
+  useEffect(() => {
+    if (status?.connected && !status?.calendarId) {
+      loadCalendars();
+    }
+  }, [status?.connected, status?.calendarId]);
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <i className="fas fa-spinner fa-spin"></i>
+            Loading...
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!status?.configured) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <i className="fab fa-google text-primary text-sm"></i>
+            Google Calendar Integration
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg bg-muted p-4 text-center">
+            <i className="fas fa-info-circle text-muted-foreground text-xl mb-2"></i>
+            <p className="text-sm text-muted-foreground">
+              Google Calendar integration is not configured. Contact your administrator to set up Google OAuth credentials.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-testid="google-calendar-section">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <i className="fab fa-google text-primary text-sm"></i>
+          Google Calendar Integration
+        </CardTitle>
+        <p className="text-sm text-muted-foreground mt-1">
+          Sync scheduled jobs with your Google Calendar for two-way updates.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {!status?.connected ? (
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted p-4 space-y-3">
+              <p className="text-sm text-foreground font-medium">Connect your Google account to:</p>
+              <ul className="text-sm text-muted-foreground space-y-1">
+                <li className="flex items-center gap-2">
+                  <i className="fas fa-check text-green-500 text-xs"></i>
+                  Automatically sync scheduled jobs to your calendar
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fas fa-check text-green-500 text-xs"></i>
+                  See job details including customer name and location
+                </li>
+                <li className="flex items-center gap-2">
+                  <i className="fas fa-check text-green-500 text-xs"></i>
+                  Import calendar events as scheduled jobs
+                </li>
+              </ul>
+            </div>
+            <Button
+              onClick={() => connectMutation.mutate()}
+              disabled={connectMutation.isPending}
+              className="w-full sm:w-auto"
+              data-testid="button-connect-google"
+            >
+              {connectMutation.isPending ? (
+                <><i className="fas fa-spinner fa-spin mr-2"></i>Connecting...</>
+              ) : (
+                <><i className="fab fa-google mr-2"></i>Connect Google Calendar</>
+              )}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Connected status */}
+            <div className="flex items-center gap-3 p-3 rounded-lg border border-green-200 bg-green-50 dark:bg-green-950/30 dark:border-green-800">
+              <div className="w-10 h-10 bg-green-100 dark:bg-green-900/50 rounded-full flex items-center justify-center">
+                <i className="fab fa-google text-green-600 dark:text-green-400"></i>
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-green-800 dark:text-green-200">Google Calendar Connected</p>
+                {status.calendarId && (
+                  <p className="text-xs text-green-600 dark:text-green-400">
+                    Syncing to: {calendars.find(c => c.id === status.calendarId)?.summary || status.calendarId}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => disconnectMutation.mutate()}
+                disabled={disconnectMutation.isPending}
+                className="border-red-200 text-red-600 hover:bg-red-50"
+                data-testid="button-disconnect-google"
+              >
+                Disconnect
+              </Button>
+            </div>
+
+            {/* Calendar selection */}
+            {!status.calendarId && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-foreground">Select a calendar to sync with:</p>
+                {loadingCalendars ? (
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                    <i className="fas fa-spinner fa-spin"></i>
+                    Loading calendars...
+                  </div>
+                ) : calendars.length > 0 ? (
+                  <div className="space-y-2">
+                    {calendars.map(calendar => (
+                      <button
+                        key={calendar.id}
+                        onClick={() => selectCalendarMutation.mutate(calendar.id)}
+                        disabled={selectCalendarMutation.isPending}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-muted transition-colors text-left"
+                        data-testid={`select-calendar-${calendar.id}`}
+                      >
+                        <div
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: calendar.backgroundColor || "#4285f4" }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground truncate">{calendar.summary}</p>
+                          {calendar.description && (
+                            <p className="text-xs text-muted-foreground truncate">{calendar.description}</p>
+                          )}
+                        </div>
+                        {calendar.primary && (
+                          <span className="text-xs bg-primary/10 text-primary px-2 py-0.5 rounded-full">Primary</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    No calendars found.
+                    <Button variant="link" className="px-1" onClick={loadCalendars}>
+                      Refresh
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Change calendar */}
+            {status.calendarId && (
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    loadCalendars();
+                    selectCalendarMutation.reset();
+                  }}
+                  data-testid="button-change-calendar"
+                >
+                  <i className="fas fa-exchange-alt mr-2"></i>
+                  Change Calendar
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

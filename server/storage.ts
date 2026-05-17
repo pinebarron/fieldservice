@@ -9,6 +9,10 @@ import {
   estimateLineItems,
   workLogs,
   apiClients,
+  recurringSchedules,
+  formTemplates,
+  formSubmissions,
+  workLogTasks,
   type User,
   type UpsertUser,
   type Business,
@@ -35,10 +39,22 @@ import {
   type InsertWorkLog,
   type UpdateWorkLog,
   type ApiClient,
+  type RecurringSchedule,
+  type InsertRecurringSchedule,
+  type UpdateRecurringSchedule,
+  type WorkLogStatus,
+  type FormTemplate,
+  type InsertFormTemplate,
+  type UpdateFormTemplate,
+  type FormSubmission,
+  type InsertFormSubmission,
+  type WorkLogTask,
+  type InsertWorkLogTask,
+  type UpdateWorkLogTask,
 } from "@shared/schema";
 import crypto from "crypto";
 import { db } from "./db";
-import { eq, and, desc, sql, ilike } from "drizzle-orm";
+import { eq, and, desc, sql, ilike, or, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -113,6 +129,18 @@ export interface IStorage {
     dateTo?: string;
     propertyId?: string;
   }): Promise<(WorkLog & { technician: User })[]>;
+
+  // Schedule operations
+  getScheduledJobs(businessId: string, month: string): Promise<(WorkLog & { technician: User })[]>;
+  updateWorkLogStatus(id: string, businessId: string, status: WorkLogStatus): Promise<WorkLog | undefined>;
+
+  // Recurring schedule operations
+  getRecurringSchedules(businessId: string): Promise<RecurringSchedule[]>;
+  getRecurringSchedule(id: string, businessId: string): Promise<RecurringSchedule | undefined>;
+  createRecurringSchedule(schedule: InsertRecurringSchedule): Promise<RecurringSchedule>;
+  updateRecurringSchedule(id: string, businessId: string, updates: UpdateRecurringSchedule): Promise<RecurringSchedule | undefined>;
+  deleteRecurringSchedule(id: string, businessId: string): Promise<boolean>;
+  getActiveRecurringSchedules(businessId: string): Promise<RecurringSchedule[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -440,6 +468,18 @@ export class DatabaseStorage implements IStorage {
         pdfUrls: workLogs.pdfUrls,
         photoMetadata: workLogs.photoMetadata,
         technicianUserIds: workLogs.technicianUserIds,
+        checkInTime: workLogs.checkInTime,
+        checkOutTime: workLogs.checkOutTime,
+        checkInLat: workLogs.checkInLat,
+        checkInLng: workLogs.checkInLng,
+        checkOutLat: workLogs.checkOutLat,
+        checkOutLng: workLogs.checkOutLng,
+        scheduledStartTime: workLogs.scheduledStartTime,
+        scheduledEndTime: workLogs.scheduledEndTime,
+        recurringScheduleId: workLogs.recurringScheduleId,
+        isRecurrenceInstance: workLogs.isRecurrenceInstance,
+        googleCalendarEventId: workLogs.googleCalendarEventId,
+        googleCalendarSyncedAt: workLogs.googleCalendarSyncedAt,
         createdAt: workLogs.createdAt,
         updatedAt: workLogs.updatedAt,
         technician: users,
@@ -573,6 +613,18 @@ export class DatabaseStorage implements IStorage {
         pdfUrls: workLogs.pdfUrls,
         photoMetadata: workLogs.photoMetadata,
         technicianUserIds: workLogs.technicianUserIds,
+        checkInTime: workLogs.checkInTime,
+        checkOutTime: workLogs.checkOutTime,
+        checkInLat: workLogs.checkInLat,
+        checkInLng: workLogs.checkInLng,
+        checkOutLat: workLogs.checkOutLat,
+        checkOutLng: workLogs.checkOutLng,
+        scheduledStartTime: workLogs.scheduledStartTime,
+        scheduledEndTime: workLogs.scheduledEndTime,
+        recurringScheduleId: workLogs.recurringScheduleId,
+        isRecurrenceInstance: workLogs.isRecurrenceInstance,
+        googleCalendarEventId: workLogs.googleCalendarEventId,
+        googleCalendarSyncedAt: workLogs.googleCalendarSyncedAt,
         createdAt: workLogs.createdAt,
         updatedAt: workLogs.updatedAt,
         technician: users,
@@ -582,6 +634,227 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(workLogs.createdAt));
     return logs;
+  }
+
+  // Schedule operations
+  async getScheduledJobs(businessId: string, month: string): Promise<(WorkLog & { technician: User })[]> {
+    // month is in YYYY-MM format
+    const [year, monthNum] = month.split("-").map(Number);
+    const startDate = `${year}-${String(monthNum).padStart(2, "0")}-01`;
+    const endDate = `${year}-${String(monthNum + 1 > 12 ? 1 : monthNum + 1).padStart(2, "0")}-01`;
+    const endYear = monthNum + 1 > 12 ? year + 1 : year;
+    const adjustedEndDate = `${endYear}-${String(monthNum + 1 > 12 ? 1 : monthNum + 1).padStart(2, "0")}-01`;
+
+    const logs = await db
+      .select({
+        id: workLogs.id,
+        businessId: workLogs.businessId,
+        propertyId: workLogs.propertyId,
+        technicianUserId: workLogs.technicianUserId,
+        customerName: workLogs.customerName,
+        workType: workLogs.workType,
+        locationName: workLogs.locationName,
+        city: workLogs.city,
+        state: workLogs.state,
+        zipCode: workLogs.zipCode,
+        serviceDate: workLogs.serviceDate,
+        startTime: workLogs.startTime,
+        endTime: workLogs.endTime,
+        workPerformed: workLogs.workPerformed,
+        additionalNotes: workLogs.additionalNotes,
+        status: workLogs.status,
+        imageUrls: workLogs.imageUrls,
+        pdfUrls: workLogs.pdfUrls,
+        photoMetadata: workLogs.photoMetadata,
+        technicianUserIds: workLogs.technicianUserIds,
+        checkInTime: workLogs.checkInTime,
+        checkOutTime: workLogs.checkOutTime,
+        checkInLat: workLogs.checkInLat,
+        checkInLng: workLogs.checkInLng,
+        checkOutLat: workLogs.checkOutLat,
+        checkOutLng: workLogs.checkOutLng,
+        scheduledStartTime: workLogs.scheduledStartTime,
+        scheduledEndTime: workLogs.scheduledEndTime,
+        recurringScheduleId: workLogs.recurringScheduleId,
+        isRecurrenceInstance: workLogs.isRecurrenceInstance,
+        googleCalendarEventId: workLogs.googleCalendarEventId,
+        googleCalendarSyncedAt: workLogs.googleCalendarSyncedAt,
+        createdAt: workLogs.createdAt,
+        updatedAt: workLogs.updatedAt,
+        technician: users,
+      })
+      .from(workLogs)
+      .innerJoin(users, eq(workLogs.technicianUserId, users.id))
+      .where(
+        and(
+          eq(workLogs.businessId, businessId),
+          sql`${workLogs.serviceDate} >= ${startDate}`,
+          sql`${workLogs.serviceDate} < ${adjustedEndDate}`
+        )
+      )
+      .orderBy(workLogs.serviceDate, workLogs.scheduledStartTime);
+    return logs;
+  }
+
+  async updateWorkLogStatus(id: string, businessId: string, status: WorkLogStatus): Promise<WorkLog | undefined> {
+    const [workLog] = await db
+      .update(workLogs)
+      .set({ status, updatedAt: new Date() })
+      .where(and(eq(workLogs.id, id), eq(workLogs.businessId, businessId)))
+      .returning();
+    return workLog;
+  }
+
+  // Recurring schedule operations
+  async getRecurringSchedules(businessId: string): Promise<RecurringSchedule[]> {
+    return db
+      .select()
+      .from(recurringSchedules)
+      .where(eq(recurringSchedules.businessId, businessId))
+      .orderBy(desc(recurringSchedules.createdAt));
+  }
+
+  async getRecurringSchedule(id: string, businessId: string): Promise<RecurringSchedule | undefined> {
+    const [schedule] = await db
+      .select()
+      .from(recurringSchedules)
+      .where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId)));
+    return schedule;
+  }
+
+  async createRecurringSchedule(scheduleData: InsertRecurringSchedule): Promise<RecurringSchedule> {
+    const [schedule] = await db.insert(recurringSchedules).values(scheduleData as any).returning();
+    return schedule;
+  }
+
+  async updateRecurringSchedule(id: string, businessId: string, updates: UpdateRecurringSchedule): Promise<RecurringSchedule | undefined> {
+    const [schedule] = await db
+      .update(recurringSchedules)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId)))
+      .returning();
+    return schedule;
+  }
+
+  async deleteRecurringSchedule(id: string, businessId: string): Promise<boolean> {
+    const result = await db
+      .delete(recurringSchedules)
+      .where(and(eq(recurringSchedules.id, id), eq(recurringSchedules.businessId, businessId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  async getActiveRecurringSchedules(businessId: string): Promise<RecurringSchedule[]> {
+    return db
+      .select()
+      .from(recurringSchedules)
+      .where(
+        and(
+          eq(recurringSchedules.businessId, businessId),
+          eq(recurringSchedules.isActive, "true")
+        )
+      );
+  }
+
+  // Form template operations
+  async getFormTemplates(businessId: string): Promise<FormTemplate[]> {
+    return db
+      .select()
+      .from(formTemplates)
+      .where(eq(formTemplates.businessId, businessId))
+      .orderBy(desc(formTemplates.createdAt));
+  }
+
+  async getFormTemplate(id: string, businessId: string): Promise<FormTemplate | undefined> {
+    const [template] = await db
+      .select()
+      .from(formTemplates)
+      .where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId)));
+    return template;
+  }
+
+  async getFormTemplatesByWorkType(businessId: string, workType: string): Promise<FormTemplate[]> {
+    return db
+      .select()
+      .from(formTemplates)
+      .where(
+        and(
+          eq(formTemplates.businessId, businessId),
+          eq(formTemplates.isActive, "true"),
+          or(eq(formTemplates.workType, workType), isNull(formTemplates.workType))
+        )
+      );
+  }
+
+  async createFormTemplate(templateData: InsertFormTemplate): Promise<FormTemplate> {
+    const [template] = await db.insert(formTemplates).values(templateData as any).returning();
+    return template;
+  }
+
+  async updateFormTemplate(id: string, businessId: string, updates: UpdateFormTemplate): Promise<FormTemplate | undefined> {
+    const [template] = await db
+      .update(formTemplates)
+      .set({ ...updates, updatedAt: new Date() } as any)
+      .where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId)))
+      .returning();
+    return template;
+  }
+
+  async deleteFormTemplate(id: string, businessId: string): Promise<boolean> {
+    const result = await db
+      .delete(formTemplates)
+      .where(and(eq(formTemplates.id, id), eq(formTemplates.businessId, businessId)));
+    return result.rowCount ? result.rowCount > 0 : false;
+  }
+
+  // Form submission operations
+  async getFormSubmissions(workLogId: string): Promise<(FormSubmission & { template: FormTemplate })[]> {
+    return db
+      .select({
+        id: formSubmissions.id,
+        workLogId: formSubmissions.workLogId,
+        templateId: formSubmissions.templateId,
+        responses: formSubmissions.responses,
+        submittedAt: formSubmissions.submittedAt,
+        template: formTemplates,
+      })
+      .from(formSubmissions)
+      .innerJoin(formTemplates, eq(formSubmissions.templateId, formTemplates.id))
+      .where(eq(formSubmissions.workLogId, workLogId));
+  }
+
+  async createFormSubmission(submissionData: InsertFormSubmission): Promise<FormSubmission> {
+    const [submission] = await db.insert(formSubmissions).values(submissionData as any).returning();
+    return submission;
+  }
+
+  // Work log task operations
+  async getWorkLogTasks(workLogId: string): Promise<WorkLogTask[]> {
+    return db
+      .select()
+      .from(workLogTasks)
+      .where(eq(workLogTasks.workLogId, workLogId))
+      .orderBy(workLogTasks.createdAt);
+  }
+
+  async createWorkLogTask(taskData: InsertWorkLogTask): Promise<WorkLogTask> {
+    const [task] = await db.insert(workLogTasks).values(taskData as any).returning();
+    return task;
+  }
+
+  async updateWorkLogTask(id: string, workLogId: string, updates: UpdateWorkLogTask): Promise<WorkLogTask | undefined> {
+    const [task] = await db
+      .update(workLogTasks)
+      .set(updates as any)
+      .where(and(eq(workLogTasks.id, id), eq(workLogTasks.workLogId, workLogId)))
+      .returning();
+    return task;
+  }
+
+  async deleteWorkLogTask(id: string, workLogId: string): Promise<boolean> {
+    const result = await db
+      .delete(workLogTasks)
+      .where(and(eq(workLogTasks.id, id), eq(workLogTasks.workLogId, workLogId)));
+    return result.rowCount ? result.rowCount > 0 : false;
   }
 }
 

@@ -419,8 +419,8 @@ export default function Dashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Total Jobs</p>
-                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-total-jobs">
+                  <p className="text-muted-foreground text-xs sm:text-sm font-medium uppercase tracking-wide">Total Jobs</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground mt-1" data-testid="stat-total-jobs">
                     {stats?.totalJobs || 0}
                   </p>
                 </div>
@@ -434,8 +434,8 @@ export default function Dashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">This Week</p>
-                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-week-jobs">
+                  <p className="text-muted-foreground text-xs sm:text-sm font-medium uppercase tracking-wide">This Week</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground mt-1" data-testid="stat-week-jobs">
                     {stats?.weekJobs || 0}
                   </p>
                 </div>
@@ -449,8 +449,8 @@ export default function Dashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Photos</p>
-                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-images">
+                  <p className="text-muted-foreground text-xs sm:text-sm font-medium uppercase tracking-wide">Photos</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground mt-1" data-testid="stat-images">
                     {stats?.images || 0}
                   </p>
                 </div>
@@ -464,8 +464,8 @@ export default function Dashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-muted-foreground text-xs font-medium uppercase tracking-wide">Reports</p>
-                  <p className="text-2xl font-bold text-foreground mt-1" data-testid="stat-reports">
+                  <p className="text-muted-foreground text-xs sm:text-sm font-medium uppercase tracking-wide">Reports</p>
+                  <p className="text-xl sm:text-2xl font-bold text-foreground mt-1" data-testid="stat-reports">
                     {stats?.reports || 0}
                   </p>
                 </div>
@@ -501,7 +501,7 @@ export default function Dashboard() {
           <>
             {workLogs.length > 0 && (
               <div className="mb-5">
-                <JobMap workLogs={filteredWorkLogs} height="280px" onPinClick={handleWorkLogSelect} />
+                <JobMap workLogs={filteredWorkLogs} className="h-48 sm:h-64 md:h-72" onPinClick={handleWorkLogSelect} />
               </div>
             )}
             <LocationsView workLogs={filteredWorkLogs} onSelectJob={handleWorkLogSelect} />
@@ -525,7 +525,7 @@ export default function Dashboard() {
                   </div>
                   <JobMap
                     workLogs={filteredWorkLogs}
-                    height="480px"
+                    className="h-64 sm:h-80 lg:h-[480px]"
                     onPinClick={handlePinClick}
                   />
                 </div>
