@@ -18,28 +18,95 @@ interface ImageUploadProps {
   maxImages?: number;
 }
 
+// Compress image before upload
+async function compressImage(file: File, maxWidth = 1920, quality = 0.8): Promise<File> {
+  return new Promise((resolve, reject) => {
+    // If file is small enough, don't compress
+    if (file.size < 500000) { // 500KB
+      resolve(file);
+      return;
+    }
+
+    const img = new Image();
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    img.onload = () => {
+      let { width, height } = img;
+
+      // Scale down if needed
+      if (width > maxWidth) {
+        height = (height * maxWidth) / width;
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              const compressedFile = new File([blob], file.name, {
+                type: 'image/jpeg',
+                lastModified: Date.now(),
+              });
+              resolve(compressedFile);
+            } else {
+              resolve(file); // Fallback to original
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      } else {
+        resolve(file);
+      }
+    };
+
+    img.onerror = () => resolve(file); // Fallback to original on error
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [uploadProgress, setUploadProgress] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const [pendingType, setPendingType] = useState<PhotoType>('general');
 
   const uploadFile = async (file: File, type: PhotoType) => {
-    const formData = new FormData();
-    formData.append('file', file);
+    try {
+      // Compress image first
+      setUploadProgress('Compressing...');
+      const compressedFile = await compressImage(file);
 
-    const result = await uploadImage(formData);
+      setUploadProgress('Uploading...');
+      const formData = new FormData();
+      formData.append('file', compressedFile);
 
-    if (result.error) {
-      throw new Error(result.error);
+      const result = await uploadImage(formData);
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (!result.url) {
+        throw new Error('No URL returned from upload');
+      }
+
+      return {
+        url: result.url,
+        type,
+        capturedAt: new Date().toISOString(),
+      };
+    } catch (err) {
+      console.error('Upload error:', err);
+      throw err;
     }
-
-    return {
-      url: result.url!,
-      type,
-      capturedAt: new Date().toISOString(),
-    };
   };
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>, type: PhotoType) => {
@@ -48,6 +115,7 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
 
     setUploading(true);
     setError('');
+    setUploadProgress('');
 
     try {
       const newImages: UploadedImage[] = [];
@@ -56,15 +124,20 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
         const file = files[i];
         if (!file.type.startsWith('image/')) continue;
 
+        setUploadProgress(`Processing ${i + 1}/${files.length}...`);
         const uploaded = await uploadFile(file, type);
         newImages.push(uploaded);
       }
 
       onChange([...images, ...newImages]);
+      setUploadProgress('');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed');
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      setError(errorMessage);
+      console.error('File upload error:', err);
     } finally {
       setUploading(false);
+      setUploadProgress('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
@@ -73,12 +146,6 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
   const removeImage = (index: number) => {
     const newImages = [...images];
     newImages.splice(index, 1);
-    onChange(newImages);
-  };
-
-  const updateImageType = (index: number, type: PhotoType) => {
-    const newImages = [...images];
-    newImages[index] = { ...newImages[index], type };
     onChange(newImages);
   };
 
@@ -296,7 +363,7 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
       {uploading && (
         <div className="text-center text-sm text-muted-foreground">
           <i className="fas fa-spinner fa-spin mr-2"></i>
-          Uploading...
+          {uploadProgress || 'Uploading...'}
         </div>
       )}
 
