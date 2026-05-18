@@ -60,6 +60,24 @@ export async function setupAuth(app: Express) {
     }
   });
 
+  // Test database write
+  app.get('/api/auth/test-db-write', async (req, res) => {
+    try {
+      const testId = 'test-' + Date.now();
+      const user = await storage.upsertUser({
+        id: testId,
+        email: 'test@test.com',
+        firstName: 'Test',
+        lastName: 'User',
+        profileImageUrl: null,
+      });
+      // Delete the test user
+      res.json({ success: true, message: 'Write succeeded', user });
+    } catch (err: any) {
+      res.json({ success: false, error: err.message, code: err.code, stack: err.stack?.split('\n').slice(0,3) });
+    }
+  });
+
   // Test Supabase connection
   app.get('/api/auth/test-supabase', async (req, res) => {
     try {
