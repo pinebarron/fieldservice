@@ -12,11 +12,23 @@ export default async function SchedulePage() {
 
   const adminClient = createAdminClient();
 
-  // Fetch work logs and form templates in parallel
+  // Fetch work logs with form submissions and form templates in parallel
   const [workLogsResult, formTemplatesResult] = await Promise.all([
     adminClient
       .from('work_logs')
-      .select('*')
+      .select(`
+        *,
+        form_submissions (
+          id,
+          template_id,
+          responses,
+          submitted_at,
+          form_templates (
+            name,
+            schema
+          )
+        )
+      `)
       .eq('business_id', business.id)
       .order('service_date', { ascending: false }),
     adminClient
