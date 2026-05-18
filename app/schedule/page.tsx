@@ -12,8 +12,8 @@ export default async function SchedulePage() {
 
   const adminClient = createAdminClient();
 
-  // Fetch work logs with form submissions and form templates in parallel
-  const [workLogsResult, formTemplatesResult] = await Promise.all([
+  // Fetch work logs, form templates, and properties in parallel
+  const [workLogsResult, formTemplatesResult, propertiesResult] = await Promise.all([
     adminClient
       .from('work_logs')
       .select(`
@@ -35,7 +35,13 @@ export default async function SchedulePage() {
       .from('form_templates')
       .select('id, name, work_type, schema')
       .eq('business_id', business.id)
-      .eq('is_active', 'true')
+      .eq('is_active', 'true'),
+    adminClient
+      .from('properties')
+      .select('id, property_name, customer_name, location_name, city, state, zip_code')
+      .eq('business_id', business.id)
+      .eq('status', 'active')
+      .order('property_name')
   ]);
 
   return (
@@ -45,6 +51,7 @@ export default async function SchedulePage() {
         <ScheduleClient
           scheduledJobs={workLogsResult.data}
           formTemplates={formTemplatesResult.data || []}
+          properties={propertiesResult.data || []}
         />
       </main>
     </div>

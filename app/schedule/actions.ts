@@ -24,6 +24,7 @@ export async function createWorkLog(formData: FormData) {
   const formTemplateId = formData.get('formTemplateId') as string;
   const formResponsesJson = formData.get('formResponses') as string;
   const imagesJson = formData.get('images') as string;
+  const propertyId = formData.get('propertyId') as string;
 
   // Parse images
   let imageUrls: string[] = [];
@@ -50,6 +51,7 @@ export async function createWorkLog(formData: FormData) {
     .insert({
       business_id: business.id,
       technician_user_id: userId,
+      property_id: propertyId || null,
       customer_name: customerName,
       work_type: workType,
       location_name: locationName,

@@ -8,6 +8,7 @@ import { WorkLogForm } from '@/components/WorkLogForm';
 import { updateWorkLogStatus, deleteWorkLog, updateWorkLog } from './actions';
 import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
 import { generateWorkReportPDF, downloadPDF } from '@/components/WorkReportPDF';
+import { JobMap } from '@/components/JobMap';
 
 interface PhotoMeta {
   url: string;
@@ -52,9 +53,20 @@ type FormTemplate = {
   schema: { fields: any[] };
 };
 
+type Property = {
+  id: string;
+  property_name: string;
+  customer_name: string;
+  location_name: string;
+  city: string;
+  state: string;
+  zip_code: string;
+};
+
 interface ScheduleClientProps {
   scheduledJobs: WorkLog[] | null;
   formTemplates: FormTemplate[];
+  properties?: Property[];
 }
 
 const WORK_TYPES = [
@@ -69,7 +81,7 @@ const WORK_TYPES = [
   'Other',
 ];
 
-export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientProps) {
+export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }: ScheduleClientProps) {
   const [showForm, setShowForm] = useState(false);
   const [selectedJob, setSelectedJob] = useState<WorkLog | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -187,6 +199,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientP
                 onClose={() => setShowForm(false)}
                 onSuccess={() => router.refresh()}
                 formTemplates={formTemplates}
+                properties={properties}
               />
             </CardContent>
           </Card>
@@ -551,6 +564,17 @@ export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientP
             alt="Full size"
             className="max-w-full max-h-full object-contain rounded-lg"
             onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
+      {/* Map View */}
+      {scheduledJobs && scheduledJobs.length > 0 && (
+        <div className="mb-6">
+          <JobMap
+            workLogs={scheduledJobs}
+            height="250px"
+            onPinClick={(job) => setSelectedJob(job as any)}
           />
         </div>
       )}

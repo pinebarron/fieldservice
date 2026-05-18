@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { createWorkLog } from '@/app/schedule/actions';
 import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
@@ -20,10 +20,21 @@ type FormTemplate = {
   schema: { fields: FormField[] };
 };
 
+type Property = {
+  id: string;
+  property_name: string;
+  customer_name: string;
+  location_name: string;
+  city: string;
+  state: string;
+  zip_code: string;
+};
+
 interface WorkLogFormProps {
   onClose: () => void;
   onSuccess: () => void;
   formTemplates?: FormTemplate[];
+  properties?: Property[];
 }
 
 const WORK_TYPES = [
@@ -38,13 +49,21 @@ const WORK_TYPES = [
   'Other',
 ];
 
-export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogFormProps) {
+export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties = [] }: WorkLogFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedWorkType, setSelectedWorkType] = useState(WORK_TYPES[0]);
   const [selectedForm, setSelectedForm] = useState<FormTemplate | null>(null);
   const [formResponses, setFormResponses] = useState<Record<string, any>>({});
   const [images, setImages] = useState<UploadedImage[]>([]);
+
+  // Form field values (controlled for property auto-fill)
+  const [customerName, setCustomerName] = useState('');
+  const [locationName, setLocationName] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [selectedPropertyId, setSelectedPropertyId] = useState('');
 
   // Auto-select form when work type changes
   useEffect(() => {
@@ -57,6 +76,20 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
       setFormResponses({});
     }
   }, [selectedWorkType, formTemplates]);
+
+  const handlePropertySelect = (propertyId: string) => {
+    setSelectedPropertyId(propertyId);
+    if (propertyId) {
+      const property = properties.find(p => p.id === propertyId);
+      if (property) {
+        setCustomerName(property.customer_name);
+        setLocationName(property.location_name);
+        setCity(property.city);
+        setState(property.state);
+        setZipCode(property.zip_code);
+      }
+    }
+  };
 
   const handleFormChange = (formId: string) => {
     const form = formTemplates.find(f => f.id === formId);
@@ -83,6 +116,11 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
     // Add images
     if (images.length > 0) {
       formData.set('images', JSON.stringify(images));
+    }
+
+    // Add property ID if selected
+    if (selectedPropertyId) {
+      formData.set('propertyId', selectedPropertyId);
     }
 
     const result = await createWorkLog(formData);
@@ -201,7 +239,7 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
         return (
           <div className="border-2 border-dashed rounded-md p-4 text-center text-muted-foreground">
             <i className="fas fa-camera text-2xl mb-2"></i>
-            <p className="text-sm">Photo capture (coming soon)</p>
+            <p className="text-sm">Use Photos section above</p>
           </div>
         );
       case 'signature':
@@ -238,12 +276,36 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
         </div>
       )}
 
+      {/* Property Selector */}
+      {properties.length > 0 && (
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
+          <label className="block text-sm font-medium mb-2">
+            <i className="fas fa-building text-primary mr-2"></i>
+            Select Existing Property (auto-fills fields)
+          </label>
+          <select
+            value={selectedPropertyId}
+            onChange={(e) => handlePropertySelect(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">-- Or enter details manually below --</option>
+            {properties.map(property => (
+              <option key={property.id} value={property.id}>
+                {property.property_name} - {property.customer_name} ({property.city}, {property.state})
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">Customer Name *</label>
           <input
             name="customerName"
             required
+            value={customerName}
+            onChange={(e) => setCustomerName(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="Customer name"
           />
@@ -269,6 +331,8 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
         <input
           name="locationName"
           required
+          value={locationName}
+          onChange={(e) => setLocationName(e.target.value)}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder="Job site name"
         />
@@ -280,6 +344,8 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
           <input
             name="city"
             required
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="City"
           />
@@ -289,6 +355,8 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
           <input
             name="state"
             required
+            value={state}
+            onChange={(e) => setState(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="CA"
           />
@@ -298,6 +366,8 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
           <input
             name="zipCode"
             required
+            value={zipCode}
+            onChange={(e) => setZipCode(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
             placeholder="90001"
           />
