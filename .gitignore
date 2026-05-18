@@ -12,3 +12,7 @@ vite.config.ts.*
 
 # Vercel
 .vercel
+
+# Next.js
+.next/
+out/
