@@ -16,8 +16,11 @@ app.get('/api/debug-env', (req, res) => {
     hasSupabaseService: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
     hasDatabaseUrl: !!process.env.DATABASE_URL,
     supabaseUrlPrefix: process.env.SUPABASE_URL?.substring(0, 30) || 'NOT SET',
+    supabaseAnonPrefix: process.env.SUPABASE_ANON_KEY?.substring(0, 30) || 'NOT SET',
     databaseUrlPrefix: process.env.DATABASE_URL?.substring(0, 30) || 'NOT SET',
     nodeEnv: process.env.NODE_ENV || 'NOT SET',
+    allSupabaseVars: Object.keys(process.env).filter(k => k.includes('SUPA')).join(', '),
+    timestamp: new Date().toISOString(),
   });
 });
 
