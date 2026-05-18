@@ -7,6 +7,12 @@ import { Button } from '@/components/ui/button';
 import { WorkLogForm } from '@/components/WorkLogForm';
 import { updateWorkLogStatus, deleteWorkLog } from './actions';
 
+interface PhotoMeta {
+  url: string;
+  type: 'before' | 'after' | 'general';
+  capturedAt: string;
+}
+
 interface WorkLog {
   id: string;
   customer_name: string;
@@ -18,6 +24,8 @@ interface WorkLog {
   start_time: string | null;
   status: string;
   work_performed: string;
+  image_urls: string[] | null;
+  photo_metadata: PhotoMeta[] | null;
 }
 
 type FormTemplate = {
@@ -119,6 +127,43 @@ export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientP
                       <p className="text-sm text-foreground mt-2 line-clamp-2">
                         {job.work_performed}
                       </p>
+                      {/* Photos */}
+                      {job.photo_metadata && job.photo_metadata.length > 0 && (
+                        <div className="mt-3 flex gap-4">
+                          {/* Before photos */}
+                          {job.photo_metadata.filter(p => p.type === 'before').length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-orange-600 mb-1">Before</p>
+                              <div className="flex gap-1">
+                                {job.photo_metadata.filter(p => p.type === 'before').slice(0, 3).map((photo, i) => (
+                                  <img
+                                    key={i}
+                                    src={photo.url}
+                                    alt="Before"
+                                    className="w-12 h-12 object-cover rounded border-2 border-orange-400"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {/* After photos */}
+                          {job.photo_metadata.filter(p => p.type === 'after').length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-green-600 mb-1">After</p>
+                              <div className="flex gap-1">
+                                {job.photo_metadata.filter(p => p.type === 'after').slice(0, 3).map((photo, i) => (
+                                  <img
+                                    key={i}
+                                    src={photo.url}
+                                    alt="After"
+                                    className="w-12 h-12 object-cover rounded border-2 border-green-400"
+                                  />
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-2 ml-4">
