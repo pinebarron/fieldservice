@@ -159,14 +159,19 @@ export async function setupAuth(app: Express) {
       });
     }
 
-    // Upsert user in local database
-    await storage.upsertUser({
-      id: data.session.user.id,
-      email: data.session.user.email ?? null,
-      firstName: data.session.user.user_metadata?.first_name ?? null,
-      lastName: data.session.user.user_metadata?.last_name ?? null,
-      profileImageUrl: data.session.user.user_metadata?.avatar_url ?? null,
-    });
+    try {
+      // Upsert user in local database
+      await storage.upsertUser({
+        id: data.session.user.id,
+        email: data.session.user.email ?? null,
+        firstName: data.session.user.user_metadata?.first_name ?? null,
+        lastName: data.session.user.user_metadata?.last_name ?? null,
+        profileImageUrl: data.session.user.user_metadata?.avatar_url ?? null,
+      });
+    } catch (dbError: any) {
+      console.error('Database upsert error:', dbError);
+      return res.status(500).json({ message: 'Database error', error: dbError.message });
+    }
 
     // Set session cookies
     setAuthCookies(res, data.session.access_token, data.session.refresh_token);
