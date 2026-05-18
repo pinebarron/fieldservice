@@ -1,0 +1,11 @@
+# Old folders from previous Vite/Express setup
+server/
+client/
+api/
+dist/
+migrations/
+shared/
+
+# Development files
+*.log
+.env.local
