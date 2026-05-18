@@ -7,7 +7,7 @@ let _supabaseAuth: SupabaseClient | null = null;
 let _supabaseAdmin: SupabaseClient | null = null;
 
 function getSupabaseUrl(): string {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL?.trim();
   if (!url) throw new Error('SUPABASE_URL environment variable is not set');
   return url;
 }
@@ -16,8 +16,8 @@ function getSupabaseUrl(): string {
 function getSupabaseAuth(): SupabaseClient {
   if (!_supabaseAuth) {
     const supabaseUrl = getSupabaseUrl();
-    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!anonKey) throw new Error('SUPABASE_ANON_KEY environment variable is not set');
+    const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)?.trim();
+    if (!anonKey) throw new Error('NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable is not set');
     _supabaseAuth = createClient(supabaseUrl, anonKey);
   }
   return _supabaseAuth;
@@ -27,7 +27,7 @@ function getSupabaseAuth(): SupabaseClient {
 function getSupabaseAdmin(): SupabaseClient {
   if (!_supabaseAdmin) {
     const supabaseUrl = getSupabaseUrl();
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
     if (!serviceKey) throw new Error('SUPABASE_SERVICE_ROLE_KEY environment variable is not set');
     _supabaseAdmin = createClient(supabaseUrl, serviceKey);
   }

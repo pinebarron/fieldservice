@@ -422,10 +422,11 @@ __export(db_exports, {
 });
 function getDb() {
   if (!_db) {
-    if (!process.env.DATABASE_URL) {
+    const dbUrl = process.env.DATABASE_URL?.trim();
+    if (!dbUrl) {
       throw new Error("DATABASE_URL environment variable is not set");
     }
-    const client = (0, import_postgres.default)(process.env.DATABASE_URL, { prepare: false });
+    const client = (0, import_postgres.default)(dbUrl, { prepare: false });
     _db = (0, import_postgres_js.drizzle)(client, { schema: schema_exports });
   }
   return _db;
@@ -925,8 +926,8 @@ var init_storage = __esm({
 // server/supabaseStorage.ts
 function getSupabase() {
   if (!_supabase) {
-    const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
+    const supabaseUrl = process.env.SUPABASE_URL?.trim();
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
     if (!supabaseUrl || !supabaseKey) {
       throw new Error("SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required");
     }
@@ -1058,15 +1059,15 @@ var init_supabaseStorage = __esm({
 
 // server/supabaseAuth.ts
 function getSupabaseUrl() {
-  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const url = process.env.SUPABASE_URL?.trim();
   if (!url) throw new Error("SUPABASE_URL environment variable is not set");
   return url;
 }
 function getSupabaseAuth() {
   if (!_supabaseAuth) {
     const supabaseUrl = getSupabaseUrl();
-    const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!anonKey) throw new Error("SUPABASE_ANON_KEY environment variable is not set");
+    const anonKey = (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY)?.trim();
+    if (!anonKey) throw new Error("NEXT_PUBLIC_SUPABASE_ANON_KEY environment variable is not set");
     _supabaseAuth = (0, import_supabase_js2.createClient)(supabaseUrl, anonKey);
   }
   return _supabaseAuth;
