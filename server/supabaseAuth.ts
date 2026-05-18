@@ -49,6 +49,35 @@ const supabase = new Proxy({} as SupabaseClient, {
 export async function setupAuth(app: Express) {
   app.set('trust proxy', 1);
 
+  // Test Supabase connection
+  app.get('/api/auth/test-supabase', async (req, res) => {
+    try {
+      const url = process.env.SUPABASE_URL;
+      const key = process.env.SUPABASE_ANON_KEY;
+
+      if (!url || !key) {
+        return res.json({ error: 'Missing env vars', url: !!url, key: !!key });
+      }
+
+      // Create a fresh client to test
+      const { createClient } = await import('@supabase/supabase-js');
+      const testClient = createClient(url, key);
+
+      // Try to get session (should return null for unauthenticated)
+      const { data, error } = await testClient.auth.getSession();
+
+      res.json({
+        success: true,
+        url: url.substring(0, 40),
+        keyPrefix: key.substring(0, 30),
+        sessionData: data,
+        error: error?.message
+      });
+    } catch (err: any) {
+      res.json({ error: err.message, stack: err.stack?.split('\n').slice(0, 3) });
+    }
+  });
+
   // Cookie debug endpoint
   app.get('/api/auth/cookie-check', (req, res) => {
     res.json({
@@ -98,13 +127,25 @@ export async function setupAuth(app: Express) {
       return res.status(400).json({ message: 'Email and password required' });
     }
 
+    // Log the Supabase config being used
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const anonKey = process.env.SUPABASE_ANON_KEY;
+    console.log('Login attempt for:', email);
+    console.log('Using Supabase URL:', supabaseUrl?.substring(0, 40));
+    console.log('Using anon key prefix:', anonKey?.substring(0, 30));
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error || !data.session) {
-      return res.status(401).json({ message: error?.message || 'Login failed' });
+      console.log('Login error:', JSON.stringify(error));
+      return res.status(401).json({
+        message: error?.message || 'Login failed',
+        code: error?.code,
+        status: error?.status
+      });
     }
 
     // Upsert user in local database
