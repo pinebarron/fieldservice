@@ -49,6 +49,17 @@ const supabase = new Proxy({} as SupabaseClient, {
 export async function setupAuth(app: Express) {
   app.set('trust proxy', 1);
 
+  // Test database connection
+  app.get('/api/auth/test-db', async (req, res) => {
+    try {
+      // Try to query the database
+      const testUser = await storage.getUser('test-nonexistent-id');
+      res.json({ success: true, message: 'Database connected', result: testUser });
+    } catch (err: any) {
+      res.json({ success: false, error: err.message, code: err.code });
+    }
+  });
+
   // Test Supabase connection
   app.get('/api/auth/test-supabase', async (req, res) => {
     try {
