@@ -15,7 +15,13 @@ interface Member {
     first_name: string | null;
     last_name: string | null;
     profile_image_url: string | null;
-  } | null;
+  } | {
+    id: string;
+    email: string;
+    first_name: string | null;
+    last_name: string | null;
+    profile_image_url: string | null;
+  }[] | null;
 }
 
 interface TeamClientProps {
@@ -116,30 +122,33 @@ export function TeamClient({ members }: TeamClientProps) {
         </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {members.map((member) => (
-            <Card key={member.id}>
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold">
-                    {member.user?.first_name?.[0] || member.user?.email?.[0]?.toUpperCase() || '?'}
-                    {member.user?.last_name?.[0] || ''}
+          {members.map((member) => {
+            const user = Array.isArray(member.user) ? member.user[0] : member.user;
+            return (
+              <Card key={member.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary to-accent rounded-full flex items-center justify-center text-white font-semibold">
+                      {user?.first_name?.[0] || user?.email?.[0]?.toUpperCase() || '?'}
+                      {user?.last_name?.[0] || ''}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold truncate">
+                        {user?.first_name || user?.last_name
+                          ? `${user?.first_name || ''} ${user?.last_name || ''}`.trim()
+                          : user?.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{member.role}</span>
+                    </div>
+                    <button onClick={() => handleRemove(member.id)} disabled={deleting === member.id} className="text-muted-foreground hover:text-destructive">
+                      <i className="fas fa-trash text-xs"></i>
+                    </button>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold truncate">
-                      {member.user?.first_name || member.user?.last_name
-                        ? `${member.user?.first_name || ''} ${member.user?.last_name || ''}`.trim()
-                        : member.user?.email}
-                    </p>
-                    <p className="text-sm text-muted-foreground truncate">{member.user?.email}</p>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary">{member.role}</span>
-                  </div>
-                  <button onClick={() => handleRemove(member.id)} disabled={deleting === member.id} className="text-muted-foreground hover:text-destructive">
-                    <i className="fas fa-trash text-xs"></i>
-                  </button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
     </>
