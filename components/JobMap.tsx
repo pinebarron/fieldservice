@@ -58,31 +58,54 @@ function makeSvgIcon(color: string, count?: number): string {
     </svg>`;
 }
 
-async function geocodeAddress(city: string, state: string, zip: string): Promise<{ lat: number; lng: number } | null> {
-  const q = encodeURIComponent(`${city}, ${state} ${zip}, USA`);
-  try {
-    const res = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`,
-      { headers: { "Accept-Language": "en" } }
-    );
-    const data = await res.json();
-    if (data?.[0]) {
-      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+async function geocodeAddress(location: string, city: string, state: string, zip: string): Promise<{ lat: number; lng: number } | null> {
+  // Try multiple query formats for better results
+  const queries = [
+    `${location}, ${city}, ${state} ${zip}, USA`,
+    `${city}, ${state} ${zip}, USA`,
+    `${zip}, USA`,
+    `${city}, ${state}, USA`,
+  ];
+
+  for (const query of queries) {
+    try {
+      const q = encodeURIComponent(query);
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=us`,
+        {
+          headers: {
+            "Accept-Language": "en",
+            "User-Agent": "FieldService App"
+          }
+        }
+      );
+      const data = await res.json();
+      if (data?.[0]) {
+        return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+      }
+    } catch (e) {
+      console.error('Geocoding error for query:', query, e);
     }
-  } catch {}
+  }
+
   return null;
 }
 
 function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "nodata">("loading");
+  const [status, setStatus] = useState<"loading" | "ready" | "nodata" | "nogeo">("loading");
+  const [address, setAddress] = useState<string>("");
 
   useEffect(() => {
     if (!mapContainerRef.current || workLogs.length === 0) {
       setStatus("nodata");
       return;
     }
+
+    // Store address for display
+    const wl = workLogs[0];
+    setAddress(`${wl.location_name}, ${wl.city}, ${wl.state} ${wl.zip_code}`);
 
     let cancelled = false;
 
@@ -95,6 +118,8 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
         link.rel = 'stylesheet';
         link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
         document.head.appendChild(link);
+        // Wait a bit for CSS to load
+        await new Promise(r => setTimeout(r, 100));
       }
 
       if (cancelled || !mapContainerRef.current) return;
@@ -114,7 +139,7 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
       mapRef.current = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution: '© OpenStreetMap',
         maxZoom: 19,
       }).addTo(map);
 
@@ -123,9 +148,10 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
       const pins: MapPin[] = [];
 
       for (const wl of workLogs) {
-        const key = `${wl.city},${wl.state},${wl.zip_code}`;
+        const key = `${wl.location_name},${wl.city},${wl.state},${wl.zip_code}`;
         if (!geocodeCache.has(key)) {
-          geocodeCache.set(key, await geocodeAddress(wl.city, wl.state, wl.zip_code));
+          const coords = await geocodeAddress(wl.location_name, wl.city, wl.state, wl.zip_code);
+          geocodeCache.set(key, coords);
         }
         const coords = geocodeCache.get(key);
         if (coords) pins.push({ ...coords, workLog: wl });
@@ -134,7 +160,7 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
       if (cancelled) return;
 
       if (pins.length === 0) {
-        setStatus("nodata");
+        setStatus("nogeo");
         return;
       }
 
@@ -186,7 +212,7 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
       }
 
       if (bounds.length === 1) {
-        map.setView(bounds[0], 13);
+        map.setView(bounds[0], 14);
       } else if (bounds.length > 1) {
         map.fitBounds(bounds as any, { padding: [40, 40] });
       }
@@ -222,6 +248,22 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
           <p className="text-sm text-muted-foreground">No location data available</p>
         </div>
       )}
+      {status === "nogeo" && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-muted gap-2 p-4">
+          <i className="fas fa-map-marker-alt text-3xl text-muted-foreground"></i>
+          <p className="text-sm text-muted-foreground text-center">Could not find location on map</p>
+          <p className="text-xs text-muted-foreground text-center">{address}</p>
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-primary hover:underline mt-2"
+          >
+            <i className="fas fa-external-link-alt mr-1"></i>
+            Try Google Maps
+          </a>
+        </div>
+      )}
       <div ref={mapContainerRef} className="w-full h-full" />
     </div>
   );
@@ -231,7 +273,7 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
 export const JobMap = dynamic(() => Promise.resolve(JobMapInner), {
   ssr: false,
   loading: () => (
-    <div className="relative rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center" style={{ height: '300px' }}>
+    <div className="relative rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center" style={{ height: '180px' }}>
       <div className="text-center">
         <i className="fas fa-spinner fa-spin text-2xl text-muted-foreground mb-2"></i>
         <p className="text-sm text-muted-foreground">Loading map...</p>
