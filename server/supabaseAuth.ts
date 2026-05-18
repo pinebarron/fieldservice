@@ -49,6 +49,16 @@ const supabase = new Proxy({} as SupabaseClient, {
 export async function setupAuth(app: Express) {
   app.set('trust proxy', 1);
 
+  // Cookie debug endpoint
+  app.get('/api/auth/cookie-check', (req, res) => {
+    res.json({
+      cookies: req.cookies,
+      rawCookieHeader: req.headers.cookie,
+      hasAccessToken: !!req.cookies?.['sb-access-token'],
+      hasRefreshToken: !!req.cookies?.['sb-refresh-token'],
+    });
+  });
+
   // Debug endpoint for auth config
   app.get('/api/auth/debug', (req, res) => {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;

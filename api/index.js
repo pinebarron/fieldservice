@@ -1080,14 +1080,22 @@ async function setupAuth(app2) {
   app2.get("/api/auth/debug", (req, res) => {
     const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const anonKey = process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
     res.json({
       url: supabaseUrl || "NOT SET",
       anonKeySource: process.env.SUPABASE_ANON_KEY ? "SUPABASE_ANON_KEY" : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? "NEXT_PUBLIC_SUPABASE_ANON_KEY" : "NONE",
-      anonKeyPrefix: anonKey ? anonKey.substring(0, 30) + "..." : "NOT SET"
+      anonKeyPrefix: anonKey ? anonKey.substring(0, 30) + "..." : "NOT SET",
+      hasAccessToken: !!req.cookies?.["sb-access-token"],
+      hasRefreshToken: !!req.cookies?.["sb-refresh-token"],
+      nodeEnv: process.env.NODE_ENV,
+      isVercel: process.env.VERCEL,
+      detectedProtocol: protocol,
+      redirectUrl: `${protocol}://${req.get("host")}/api/auth/callback`
     });
   });
   app2.get("/api/login", (req, res) => {
-    const redirectTo = `${req.protocol}://${req.get("host")}/api/auth/callback`;
+    const protocol = req.headers["x-forwarded-proto"] || req.protocol;
+    const redirectTo = `${protocol}://${req.get("host")}/api/auth/callback`;
     const supabaseUrl = process.env.SUPABASE_URL;
     const authUrl = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
     res.redirect(authUrl);
@@ -1184,14 +1192,16 @@ async function setupAuth(app2) {
   });
 }
 function setAuthCookies(res, accessToken, refreshToken) {
+  const isProduction = process.env.NODE_ENV === "production" || process.env.VERCEL === "1";
   const cookieOptions = {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    secure: isProduction,
     sameSite: "lax",
     maxAge: 7 * 24 * 60 * 60 * 1e3,
     // 1 week
     path: "/"
   };
+  console.log("Setting cookies, secure:", isProduction);
   res.cookie("sb-access-token", accessToken, cookieOptions);
   res.cookie("sb-refresh-token", refreshToken, cookieOptions);
 }
