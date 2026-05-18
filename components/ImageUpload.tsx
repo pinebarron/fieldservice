@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
+import { uploadImage } from '@/app/schedule/upload-action';
 
 export type PhotoType = 'before' | 'after' | 'general';
 
@@ -28,19 +29,14 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
     const formData = new FormData();
     formData.append('file', file);
 
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    });
+    const result = await uploadImage(formData);
 
-    if (!response.ok) {
-      const data = await response.json();
-      throw new Error(data.error || 'Upload failed');
+    if (result.error) {
+      throw new Error(result.error);
     }
 
-    const data = await response.json();
     return {
-      url: data.url,
+      url: result.url!,
       type,
       capturedAt: new Date().toISOString(),
     };
