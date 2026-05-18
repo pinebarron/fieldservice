@@ -390,8 +390,16 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
                     </div>
                   </div>
 
+                  {/* Map */}
+                  <div className="mb-6">
+                    <JobMap
+                      workLogs={[selectedJob]}
+                      height="180px"
+                    />
+                  </div>
+
                   {/* Location & Date */}
-                  <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="bg-muted/50 rounded-lg p-3">
                       <p className="text-xs text-muted-foreground mb-1">Location</p>
                       <p className="font-medium">{selectedJob.location_name}</p>
@@ -406,6 +414,19 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
                         </p>
                       )}
                     </div>
+                  </div>
+
+                  {/* Get Directions Button */}
+                  <div className="mb-6">
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${selectedJob.location_name}, ${selectedJob.city}, ${selectedJob.state} ${selectedJob.zip_code}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                    >
+                      <i className="fas fa-directions"></i>
+                      Get Directions
+                    </a>
                   </div>
 
                   {/* Work Performed */}
