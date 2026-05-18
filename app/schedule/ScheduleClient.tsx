@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { WorkLogForm } from '@/components/WorkLogForm';
 import { updateWorkLogStatus, deleteWorkLog, updateWorkLog } from './actions';
 import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
+import { generateWorkReportPDF, downloadPDF } from '@/components/WorkReportPDF';
 
 interface PhotoMeta {
   url: string;
@@ -75,6 +76,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientP
   const [updating, setUpdating] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [editError, setEditError] = useState('');
+  const [generatingPDF, setGeneratingPDF] = useState(false);
 
   // Edit form state
   const [editImages, setEditImages] = useState<UploadedImage[]>([]);
@@ -138,6 +140,21 @@ export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientP
       setSelectedJob(null);
       router.refresh();
       setUpdating(null);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!selectedJob) return;
+    setGeneratingPDF(true);
+    try {
+      const blob = await generateWorkReportPDF(selectedJob, 'FieldService');
+      const filename = `WorkOrder-${selectedJob.customer_name.replace(/\s+/g, '_')}-${selectedJob.service_date}.pdf`;
+      downloadPDF(blob, filename);
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      alert('Failed to generate PDF');
+    } finally {
+      setGeneratingPDF(false);
     }
   };
 
@@ -487,8 +504,16 @@ export function ScheduleClient({ scheduledJobs, formTemplates }: ScheduleClientP
 
                   {/* Actions */}
                   <div className="flex gap-3 pt-4 border-t">
-                    <Button variant="outline" onClick={() => setSelectedJob(null)} className="flex-1">
+                    <Button variant="outline" onClick={() => setSelectedJob(null)}>
                       Close
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={handleExportPDF}
+                      disabled={generatingPDF}
+                    >
+                      <i className={`fas ${generatingPDF ? 'fa-spinner fa-spin' : 'fa-file-pdf'} mr-2`}></i>
+                      {generatingPDF ? 'Generating...' : 'Export PDF'}
                     </Button>
                     <Button onClick={startEditing} className="flex-1">
                       <i className="fas fa-edit mr-2"></i>
