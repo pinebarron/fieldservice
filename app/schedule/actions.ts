@@ -23,6 +23,20 @@ export async function createWorkLog(formData: FormData) {
   const notes = formData.get('notes') as string;
   const formTemplateId = formData.get('formTemplateId') as string;
   const formResponsesJson = formData.get('formResponses') as string;
+  const imagesJson = formData.get('images') as string;
+
+  // Parse images
+  let imageUrls: string[] = [];
+  let photoMetadata: { url: string; type: string; capturedAt: string }[] = [];
+  if (imagesJson) {
+    try {
+      const images = JSON.parse(imagesJson);
+      imageUrls = images.map((img: { url: string }) => img.url);
+      photoMetadata = images;
+    } catch (e) {
+      console.error('Error parsing images:', e);
+    }
+  }
 
   if (!customerName || !workType || !locationName || !city || !state || !zipCode || !serviceDate || !workPerformed) {
     return { error: 'All required fields must be filled' };
@@ -46,6 +60,8 @@ export async function createWorkLog(formData: FormData) {
       work_performed: workPerformed,
       status,
       additional_notes: notes || null,
+      image_urls: imageUrls.length > 0 ? imageUrls : null,
+      photo_metadata: photoMetadata.length > 0 ? photoMetadata : null,
     })
     .select('id')
     .single();

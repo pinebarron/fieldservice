@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { createWorkLog } from '@/app/schedule/actions';
+import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
 
 type FormField = {
   id: string;
@@ -43,6 +44,7 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
   const [selectedWorkType, setSelectedWorkType] = useState(WORK_TYPES[0]);
   const [selectedForm, setSelectedForm] = useState<FormTemplate | null>(null);
   const [formResponses, setFormResponses] = useState<Record<string, any>>({});
+  const [images, setImages] = useState<UploadedImage[]>([]);
 
   // Auto-select form when work type changes
   useEffect(() => {
@@ -76,6 +78,11 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
     if (selectedForm) {
       formData.set('formTemplateId', selectedForm.id);
       formData.set('formResponses', JSON.stringify(formResponses));
+    }
+
+    // Add images
+    if (images.length > 0) {
+      formData.set('images', JSON.stringify(images));
     }
 
     const result = await createWorkLog(formData);
@@ -340,6 +347,15 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [] }: WorkLogF
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder="Any additional notes..."
         />
+      </div>
+
+      {/* Photo Upload */}
+      <div className="border-t pt-4">
+        <label className="block text-sm font-medium mb-3">
+          <i className="fas fa-camera text-primary mr-2"></i>
+          Photos (Before / After)
+        </label>
+        <ImageUpload images={images} onChange={setImages} maxImages={10} />
       </div>
 
       {/* Form Template Selection */}
