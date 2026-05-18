@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import type { Stats } from '@/lib/types';
+import { DashboardMap } from './DashboardMap';
 
 export default async function DashboardPage() {
   const { user, userProfile, business, userId } = await getUserAndBusiness();
@@ -20,13 +21,24 @@ export default async function DashboardPage() {
 
   const adminClient = createAdminClient();
 
-  // Fetch work logs
-  const { data: workLogs } = await adminClient
-    .from('work_logs')
-    .select('*')
-    .eq('business_id', business.id)
-    .order('service_date', { ascending: false })
-    .limit(10);
+  // Fetch work logs and in-progress jobs
+  const [workLogsResult, inProgressResult] = await Promise.all([
+    adminClient
+      .from('work_logs')
+      .select('*')
+      .eq('business_id', business.id)
+      .order('service_date', { ascending: false })
+      .limit(10),
+    adminClient
+      .from('work_logs')
+      .select('id, customer_name, work_type, location_name, city, state, zip_code, service_date, status')
+      .eq('business_id', business.id)
+      .eq('status', 'in-progress')
+      .order('service_date', { ascending: false })
+  ]);
+
+  const workLogs = workLogsResult.data;
+  const inProgressJobs = inProgressResult.data || [];
 
   // Calculate stats
   const now = new Date();
@@ -160,6 +172,9 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* In Progress Jobs Map */}
+        <DashboardMap inProgressJobs={inProgressJobs} />
 
         {/* Recent Work Logs */}
         <Card>
