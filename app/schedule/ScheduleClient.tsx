@@ -589,17 +589,6 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
         </div>
       )}
 
-      {/* Map View */}
-      {scheduledJobs && scheduledJobs.length > 0 && (
-        <div className="mb-6">
-          <JobMap
-            workLogs={scheduledJobs}
-            height="250px"
-            onPinClick={(job) => setSelectedJob(job as any)}
-          />
-        </div>
-      )}
-
       {!scheduledJobs || scheduledJobs.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
