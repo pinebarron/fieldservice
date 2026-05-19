@@ -7,6 +7,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { updateEstimate, deleteEstimate } from '../actions';
 
+function estimateNum(id: string) {
+  return 'EST-' + id.replace(/-/g, '').slice(0, 8).toUpperCase();
+}
+
 interface LineItem {
   id?: string;
   description: string;
@@ -60,6 +64,12 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
   const [deleting, setDeleting] = useState(false);
   const [showCatalog, setShowCatalog] = useState(false);
   const [catalogSearch, setCatalogSearch] = useState('');
+  const [showPreview, setShowPreview] = useState(false);
+  const [showSendModal, setShowSendModal] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendMessage, setSendMessage] = useState('');
+  const [sendError, setSendError] = useState('');
+  const [sendSuccess, setSendSuccess] = useState(false);
 
   // Form state
   const [title, setTitle] = useState(estimate.title);
@@ -140,6 +150,46 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
     router.push('/estimates');
   };
 
+  const handleSendEmail = async () => {
+    if (!customerEmail) {
+      setSendError('Customer email is required to send estimate');
+      return;
+    }
+
+    setSending(true);
+    setSendError('');
+
+    try {
+      const response = await fetch(`/api/estimates/${estimate.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customMessage: sendMessage }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to send email');
+      }
+
+      setSendSuccess(true);
+      setStatus('sent');
+      setTimeout(() => {
+        setShowSendModal(false);
+        setSendSuccess(false);
+        setSendMessage('');
+        router.refresh();
+      }, 2000);
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Failed to send email');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleDownloadPdf = () => {
+    window.open(`/api/estimates/${estimate.id}/pdf`, '_blank');
+  };
+
   const filteredCatalog = pricingItems.filter(
     p => p.name.toLowerCase().includes(catalogSearch.toLowerCase()) ||
          p.category.toLowerCase().includes(catalogSearch.toLowerCase())
@@ -175,12 +225,20 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
             <option value="declined">Declined</option>
           </select>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={handleDelete} disabled={deleting}>
-            <i className="fas fa-trash mr-2"></i>
-            {deleting ? 'Deleting...' : 'Delete'}
+        <div className="flex gap-2 flex-wrap">
+          <Button variant="outline" size="sm" onClick={() => setShowPreview(true)}>
+            <i className="fas fa-eye mr-2"></i>
+            Preview
           </Button>
-          <Button onClick={handleSave} disabled={saving}>
+          <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+            <i className="fas fa-download mr-2"></i>
+            PDF
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setShowSendModal(true)}>
+            <i className="fas fa-paper-plane mr-2"></i>
+            Send
+          </Button>
+          <Button size="sm" onClick={handleSave} disabled={saving}>
             <i className="fas fa-save mr-2"></i>
             {saving ? 'Saving...' : 'Save'}
           </Button>
@@ -455,6 +513,138 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
                     </div>
                   </button>
                 ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Preview Modal */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background w-full max-w-4xl h-[90vh] rounded-lg flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold">PDF Preview</h3>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleDownloadPdf}>
+                  <i className="fas fa-download mr-2"></i>
+                  Download
+                </Button>
+                <button onClick={() => setShowPreview(false)} className="p-2 hover:bg-muted rounded">
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={`/api/estimates/${estimate.id}/pdf`}
+                className="w-full h-full"
+                title="Estimate PDF Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Send Email Modal */}
+      {showSendModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50">
+          <div className="bg-background w-full sm:max-w-lg sm:rounded-lg">
+            <div className="p-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold">Send Estimate to Customer</h3>
+              <button onClick={() => { setShowSendModal(false); setSendError(''); setSendSuccess(false); }} className="p-1">
+                <i className="fas fa-times"></i>
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              {sendSuccess ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i className="fas fa-check text-2xl text-green-600"></i>
+                  </div>
+                  <h4 className="font-semibold text-lg mb-2">Estimate Sent!</h4>
+                  <p className="text-muted-foreground">
+                    Email sent to {customerEmail}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-muted/50 rounded-lg p-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                        <i className="fas fa-file-invoice-dollar text-primary"></i>
+                      </div>
+                      <div>
+                        <p className="font-medium">{title}</p>
+                        <p className="text-sm text-muted-foreground">{estimateNum(estimate.id)}</p>
+                      </div>
+                    </div>
+                    <div className="text-sm space-y-1">
+                      <p><span className="text-muted-foreground">To:</span> {customerName}</p>
+                      <p><span className="text-muted-foreground">Email:</span> {customerEmail || <span className="text-destructive">Not provided</span>}</p>
+                      <p><span className="text-muted-foreground">Total:</span> {fmt(total)}</p>
+                    </div>
+                  </div>
+
+                  {!customerEmail && (
+                    <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg">
+                      <i className="fas fa-exclamation-circle mr-2"></i>
+                      Customer email is required. Please add an email address above.
+                    </div>
+                  )}
+
+                  {sendError && (
+                    <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-lg">
+                      <i className="fas fa-exclamation-circle mr-2"></i>
+                      {sendError}
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Personal Message (optional)
+                    </label>
+                    <textarea
+                      value={sendMessage}
+                      onChange={(e) => setSendMessage(e.target.value)}
+                      rows={3}
+                      placeholder="Add a personal note to include in the email..."
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    />
+                  </div>
+
+                  <div className="text-sm text-muted-foreground">
+                    <i className="fas fa-paperclip mr-2"></i>
+                    The estimate PDF will be attached to the email.
+                  </div>
+
+                  <div className="flex gap-3 pt-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => { setShowSendModal(false); setSendError(''); }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleSendEmail}
+                      disabled={sending || !customerEmail}
+                    >
+                      {sending ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin mr-2"></i>
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-paper-plane mr-2"></i>
+                          Send Email
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           </div>
