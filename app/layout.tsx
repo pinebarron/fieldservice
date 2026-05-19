@@ -3,6 +3,7 @@ import './globals.css';
 import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { OfflineProvider } from '@/components/OfflineProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Field Capture',
@@ -43,7 +44,13 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body>
-        {children}
+        <ErrorBoundary>
+          <OfflineProvider>
+            <OfflineIndicator />
+            <UpdatePrompt />
+            {children}
+          </OfflineProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );
