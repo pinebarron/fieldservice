@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { createEstimate } from '@/app/estimates/actions';
 
@@ -10,6 +11,7 @@ interface EstimateFormProps {
 }
 
 export function EstimateForm({ onClose, onSuccess }: EstimateFormProps) {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -24,6 +26,9 @@ export function EstimateForm({ onClose, onSuccess }: EstimateFormProps) {
     if (result?.error) {
       setError(result.error);
       setLoading(false);
+    } else if (result?.id) {
+      // Redirect to detail page to add line items
+      router.push(`/estimates/${result.id}`);
     } else {
       onSuccess();
       onClose();

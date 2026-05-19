@@ -25,7 +25,7 @@ export async function createEstimate(formData: FormData) {
 
   const adminClient = createAdminClient();
 
-  const { error } = await adminClient
+  const { data, error } = await adminClient
     .from('estimates')
     .insert({
       business_id: business.id,
@@ -39,7 +39,9 @@ export async function createEstimate(formData: FormData) {
       status: 'draft',
       tax_rate: '0',
       discount_amount: '0',
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) {
     console.error('Error creating estimate:', error);
@@ -47,7 +49,7 @@ export async function createEstimate(formData: FormData) {
   }
 
   revalidatePath('/estimates');
-  return { success: true };
+  return { success: true, id: data.id };
 }
 
 export async function updateEstimateStatus(id: string, status: string) {
