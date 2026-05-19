@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { EstimateForm } from '@/components/EstimateForm';
@@ -90,62 +91,54 @@ export function EstimatesClient({ estimates }: EstimatesClientProps) {
       ) : (
         <div className="space-y-3">
           {estimates.map((estimate) => (
-            <Card key={estimate.id}>
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <i className="fas fa-file-invoice-dollar text-primary"></i>
+            <Link key={estimate.id} href={`/estimates/${estimate.id}`}>
+              <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-start gap-3 flex-1">
+                      <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                        <i className="fas fa-file-invoice-dollar text-primary"></i>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground">{estimate.title}</p>
+                        <p className="text-sm text-muted-foreground">{estimate.customer_name}</p>
+                        {estimate.customer_email && (
+                          <p className="text-xs text-muted-foreground">{estimate.customer_email}</p>
+                        )}
+                        {estimate.valid_until && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Valid until: {estimate.valid_until}
+                          </p>
+                        )}
+                        {estimate.description && (
+                          <p className="text-sm text-foreground mt-2 line-clamp-2">
+                            {estimate.description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-foreground">{estimate.title}</p>
-                      <p className="text-sm text-muted-foreground">{estimate.customer_name}</p>
-                      {estimate.customer_email && (
-                        <p className="text-xs text-muted-foreground">{estimate.customer_email}</p>
-                      )}
-                      {estimate.valid_until && (
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Valid until: {estimate.valid_until}
-                        </p>
-                      )}
-                      {estimate.description && (
-                        <p className="text-sm text-foreground mt-2 line-clamp-2">
-                          {estimate.description}
-                        </p>
-                      )}
+                    <div className="flex flex-col items-end gap-2 ml-4">
+                      <span
+                        className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          estimate.status === 'accepted'
+                            ? 'bg-green-100 text-green-700'
+                            : estimate.status === 'sent'
+                            ? 'bg-blue-100 text-blue-700'
+                            : estimate.status === 'declined'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-muted text-muted-foreground'
+                        }`}
+                      >
+                        {estimate.status}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        <i className="fas fa-chevron-right"></i>
+                      </span>
                     </div>
                   </div>
-                  <div className="flex flex-col items-end gap-2 ml-4">
-                    <select
-                      value={estimate.status}
-                      onChange={(e) => handleStatusChange(estimate.id, e.target.value)}
-                      disabled={updating === estimate.id}
-                      className={`text-xs px-2 py-1 rounded-full font-medium border-0 cursor-pointer ${
-                        estimate.status === 'accepted'
-                          ? 'bg-green-100 text-green-700'
-                          : estimate.status === 'sent'
-                          ? 'bg-blue-100 text-blue-700'
-                          : estimate.status === 'declined'
-                          ? 'bg-red-100 text-red-700'
-                          : 'bg-muted text-muted-foreground'
-                      }`}
-                    >
-                      <option value="draft">Draft</option>
-                      <option value="sent">Sent</option>
-                      <option value="accepted">Accepted</option>
-                      <option value="declined">Declined</option>
-                    </select>
-                    <button
-                      onClick={() => handleDelete(estimate.id)}
-                      disabled={updating === estimate.id}
-                      className="text-xs text-muted-foreground hover:text-destructive"
-                    >
-                      <i className="fas fa-trash"></i>
-                    </button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Link>
           ))}
         </div>
       )}
