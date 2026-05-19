@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserAndBusiness } from '@/lib/supabase/getUserAndBusiness';
 import sgMail from '@sendgrid/mail';
 import { renderToBuffer } from '@react-pdf/renderer';
+import React from 'react';
 import { EstimatePDF } from '@/components/EstimatePDF';
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY!);
@@ -67,7 +68,7 @@ export async function POST(
     const total = subtotal - discount + tax;
 
     // Generate PDF
-    const pdfElement = EstimatePDF({
+    const pdfElement = React.createElement(EstimatePDF, {
       estimate,
       lineItems: items.map(li => ({
         description: li.description,

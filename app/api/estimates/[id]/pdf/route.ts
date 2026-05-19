@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserAndBusiness } from '@/lib/supabase/getUserAndBusiness';
 import { renderToBuffer } from '@react-pdf/renderer';
+import React from 'react';
 import { EstimatePDF } from '@/components/EstimatePDF';
 
 function estimateNum(id: string) {
@@ -42,7 +43,7 @@ export async function GET(
       .order('sort_order');
 
     // Generate PDF
-    const pdfElement = EstimatePDF({
+    const pdfElement = React.createElement(EstimatePDF, {
       estimate,
       lineItems: (lineItems || []).map(li => ({
         description: li.description,

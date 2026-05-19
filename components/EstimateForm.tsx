@@ -27,7 +27,8 @@ export function EstimateForm({ onClose, onSuccess }: EstimateFormProps) {
       setError(result.error);
       setLoading(false);
     } else if (result?.id) {
-      // Redirect to detail page to add line items
+      // Close modal first, then redirect to detail page to add line items
+      onClose();
       router.push(`/estimates/${result.id}`);
     } else {
       onSuccess();
