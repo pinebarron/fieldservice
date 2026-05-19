@@ -43,11 +43,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body>
-        <OfflineProvider>
-          <OfflineIndicator />
-          <UpdatePrompt />
-          {children}
-        </OfflineProvider>
+        {children}
       </body>
     </html>
   );
