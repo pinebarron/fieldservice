@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { uploadImage } from '@/app/schedule/upload-action';
+import { GPSCamera, CapturedPhoto } from './GPSCamera';
 
 export type PhotoType = 'before' | 'after' | 'general';
 
@@ -10,6 +11,11 @@ export interface UploadedImage {
   url: string;
   type: PhotoType;
   capturedAt: string;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  altitude?: number;
+  hasExif?: boolean;
 }
 
 interface ImageUploadProps {
@@ -75,8 +81,9 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
   const [error, setError] = useState('');
   const [uploadProgress, setUploadProgress] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cameraInputRef = useRef<HTMLInputElement>(null);
   const [pendingType, setPendingType] = useState<PhotoType>('general');
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraPhotoType, setCameraPhotoType] = useState<PhotoType>('general');
 
   const uploadFile = async (file: File, type: PhotoType) => {
     try {
@@ -139,7 +146,6 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
       setUploading(false);
       setUploadProgress('');
       if (fileInputRef.current) fileInputRef.current.value = '';
-      if (cameraInputRef.current) cameraInputRef.current.value = '';
     }
   };
 
@@ -155,8 +161,60 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
   };
 
   const triggerCamera = (type: PhotoType) => {
-    setPendingType(type);
-    cameraInputRef.current?.click();
+    setCameraPhotoType(type);
+    setShowCamera(true);
+  };
+
+  const handleCameraCapture = async (photo: CapturedPhoto) => {
+    setShowCamera(false);
+    setUploading(true);
+    setError('');
+
+    try {
+      // Convert blob to file
+      const file = new File([photo.blob], `photo-${Date.now()}.jpg`, {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      // Compress if needed
+      setUploadProgress('Compressing...');
+      const compressedFile = await compressImage(file);
+
+      setUploadProgress('Uploading...');
+      const formData = new FormData();
+      formData.append('file', compressedFile);
+
+      const result = await uploadImage(formData);
+
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      if (!result.url) {
+        throw new Error('No URL returned from upload');
+      }
+
+      const newImage: UploadedImage = {
+        url: result.url,
+        type: cameraPhotoType,
+        capturedAt: photo.capturedAt,
+        lat: photo.lat ?? undefined,
+        lng: photo.lng ?? undefined,
+        accuracy: photo.accuracy ?? undefined,
+        altitude: photo.altitude ?? undefined,
+        hasExif: photo.hasExif,
+      };
+
+      onChange([...images, newImage]);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Upload failed';
+      setError(errorMessage);
+      console.error('Camera upload error:', err);
+    } finally {
+      setUploading(false);
+      setUploadProgress('');
+    }
   };
 
   const beforeImages = images.filter(img => img.type === 'before');
@@ -164,27 +222,26 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
   const generalImages = images.filter(img => img.type === 'general');
 
   return (
-    <div className="space-y-4">
+    <>
+      {showCamera && (
+        <GPSCamera
+          onCapture={handleCameraCapture}
+          onClose={() => setShowCamera(false)}
+        />
+      )}
+      <div className="space-y-4">
       {error && (
         <div className="p-2 rounded bg-destructive/10 text-destructive text-sm">
           {error}
         </div>
       )}
 
-      {/* Hidden file inputs */}
+      {/* Hidden file input for gallery selection */}
       <input
         ref={fileInputRef}
         type="file"
         accept="image/*"
         multiple
-        className="hidden"
-        onChange={(e) => handleFileSelect(e, pendingType)}
-      />
-      <input
-        ref={cameraInputRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={(e) => handleFileSelect(e, pendingType)}
       />
@@ -228,6 +285,14 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
                     alt="Before"
                     className="w-full h-20 object-cover rounded border-2 border-orange-500"
                   />
+                  {img.lat && img.lng && (
+                    <div
+                      className={`absolute bottom-1 left-1 w-5 h-5 ${img.hasExif ? 'bg-green-600' : 'bg-yellow-600'} text-white rounded-full flex items-center justify-center`}
+                      title={`GPS: ${img.lat.toFixed(4)}, ${img.lng.toFixed(4)}${img.hasExif ? ' (EXIF embedded)' : ''}`}
+                    >
+                      <i className={`fas ${img.hasExif ? 'fa-check' : 'fa-map-marker-alt'} text-xs`}></i>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeImage(originalIndex)}
@@ -285,6 +350,14 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
                     alt="After"
                     className="w-full h-20 object-cover rounded border-2 border-green-500"
                   />
+                  {img.lat && img.lng && (
+                    <div
+                      className={`absolute bottom-1 left-1 w-5 h-5 ${img.hasExif ? 'bg-green-600' : 'bg-yellow-600'} text-white rounded-full flex items-center justify-center`}
+                      title={`GPS: ${img.lat.toFixed(4)}, ${img.lng.toFixed(4)}${img.hasExif ? ' (EXIF embedded)' : ''}`}
+                    >
+                      <i className={`fas ${img.hasExif ? 'fa-check' : 'fa-map-marker-alt'} text-xs`}></i>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeImage(originalIndex)}
@@ -342,6 +415,14 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
                     alt="Photo"
                     className="w-full h-20 object-cover rounded border-2 border-blue-500"
                   />
+                  {img.lat && img.lng && (
+                    <div
+                      className={`absolute bottom-1 left-1 w-5 h-5 ${img.hasExif ? 'bg-green-600' : 'bg-yellow-600'} text-white rounded-full flex items-center justify-center`}
+                      title={`GPS: ${img.lat.toFixed(4)}, ${img.lng.toFixed(4)}${img.hasExif ? ' (EXIF embedded)' : ''}`}
+                    >
+                      <i className={`fas ${img.hasExif ? 'fa-check' : 'fa-map-marker-alt'} text-xs`}></i>
+                    </div>
+                  )}
                   <button
                     type="button"
                     onClick={() => removeImage(originalIndex)}
@@ -371,5 +452,6 @@ export function ImageUpload({ images, onChange, maxImages = 10 }: ImageUploadPro
         {images.length} / {maxImages} photos
       </p>
     </div>
+    </>
   );
 }

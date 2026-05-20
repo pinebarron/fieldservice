@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { createWorkLog } from '@/app/schedule/actions';
+import { uploadImage } from '@/app/schedule/upload-action';
 import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
 
 type FormField = {
@@ -11,13 +12,19 @@ type FormField = {
   label: string;
   required?: boolean;
   options?: { label: string; value: string }[];
+  sectionId?: string;
+};
+
+type FormSection = {
+  id: string;
+  title: string;
 };
 
 type FormTemplate = {
   id: string;
   name: string;
   work_type: string | null;
-  schema: { fields: FormField[] };
+  schema: { fields: FormField[]; sections?: FormSection[] };
 };
 
 type Property = {
@@ -236,10 +243,78 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
           </label>
         );
       case 'photo':
+        const photoUrl = value as string;
+        const photoInputId = `photo-input-${field.id}`;
         return (
-          <div className="border-2 border-dashed rounded-md p-4 text-center text-muted-foreground">
-            <i className="fas fa-camera text-2xl mb-2"></i>
-            <p className="text-sm">Use Photos section above</p>
+          <div className="space-y-2">
+            {photoUrl ? (
+              <div className="relative inline-block">
+                <img src={photoUrl} alt={field.label} className="w-32 h-32 object-cover rounded-lg border" />
+                <button
+                  type="button"
+                  onClick={() => handleFieldChange(field.id, '')}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full text-xs flex items-center justify-center"
+                >
+                  <i className="fas fa-times"></i>
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  id={photoInputId}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const result = await uploadImage(formData);
+                    if (result.url) {
+                      handleFieldChange(field.id, result.url);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById(photoInputId)?.click()}
+                >
+                  <i className="fas fa-camera mr-2"></i>
+                  Take Photo
+                </Button>
+                <input
+                  id={`${photoInputId}-file`}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    const result = await uploadImage(formData);
+                    if (result.url) {
+                      handleFieldChange(field.id, result.url);
+                    }
+                    e.target.value = '';
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => document.getElementById(`${photoInputId}-file`)?.click()}
+                >
+                  <i className="fas fa-upload mr-2"></i>
+                  Upload
+                </Button>
+              </div>
+            )}
           </div>
         );
       case 'signature':
@@ -250,10 +325,55 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
           </div>
         );
       case 'gps':
+        const gpsValue = value as { lat: number; lng: number } | null;
         return (
-          <div className="border-2 border-dashed rounded-md p-4 text-center text-muted-foreground">
-            <i className="fas fa-map-marker-alt text-2xl mb-2"></i>
-            <p className="text-sm">GPS location (coming soon)</p>
+          <div className="space-y-2">
+            {gpsValue ? (
+              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                <i className="fas fa-map-marker-alt text-primary text-lg"></i>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Location captured</p>
+                  <p className="text-xs text-muted-foreground">
+                    {gpsValue.lat.toFixed(6)}, {gpsValue.lng.toFixed(6)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleFieldChange(field.id, null)}
+                >
+                  <i className="fas fa-times mr-1"></i>
+                  Clear
+                </Button>
+              </div>
+            ) : (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  if ('geolocation' in navigator) {
+                    navigator.geolocation.getCurrentPosition(
+                      (position) => {
+                        handleFieldChange(field.id, {
+                          lat: position.coords.latitude,
+                          lng: position.coords.longitude,
+                        });
+                      },
+                      (error) => {
+                        alert('Unable to get location: ' + error.message);
+                      },
+                      { enableHighAccuracy: true }
+                    );
+                  } else {
+                    alert('Geolocation is not supported by your browser');
+                  }
+                }}
+              >
+                <i className="fas fa-map-marker-alt mr-2"></i>
+                Capture GPS Location
+              </Button>
+            )}
           </div>
         );
       default:
@@ -457,14 +577,52 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
             <i className="fas fa-clipboard-list text-primary"></i>
             {selectedForm.name}
           </h4>
-          {selectedForm.schema.fields.map(field => (
-            <div key={field.id}>
-              <label className="block text-sm font-medium mb-1">
-                {field.label} {field.required && <span className="text-destructive">*</span>}
-              </label>
-              {renderFormField(field)}
-            </div>
-          ))}
+
+          {/* Render fields grouped by sections */}
+          {(() => {
+            const sections = selectedForm.schema.sections || [];
+            const fields = selectedForm.schema.fields;
+            const unsectionedFields = fields.filter(f => !f.sectionId);
+
+            return (
+              <>
+                {/* Unsectioned fields first */}
+                {unsectionedFields.map(field => (
+                  <div key={field.id}>
+                    <label className="block text-sm font-medium mb-1">
+                      {field.label} {field.required && <span className="text-destructive">*</span>}
+                    </label>
+                    {renderFormField(field)}
+                  </div>
+                ))}
+
+                {/* Then sectioned fields */}
+                {sections.map(section => {
+                  const sectionFields = fields.filter(f => f.sectionId === section.id);
+                  if (sectionFields.length === 0) return null;
+
+                  return (
+                    <div key={section.id} className="border-t pt-4 mt-4">
+                      <h5 className="font-medium text-sm text-primary mb-3 flex items-center gap-2">
+                        <i className="fas fa-folder-open"></i>
+                        {section.title}
+                      </h5>
+                      <div className="space-y-4">
+                        {sectionFields.map(field => (
+                          <div key={field.id}>
+                            <label className="block text-sm font-medium mb-1">
+                              {field.label} {field.required && <span className="text-destructive">*</span>}
+                            </label>
+                            {renderFormField(field)}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </>
+            );
+          })()}
         </div>
       )}
 

@@ -26,9 +26,9 @@ export async function createWorkLog(formData: FormData) {
   const imagesJson = formData.get('images') as string;
   const propertyId = formData.get('propertyId') as string;
 
-  // Parse images
+  // Parse images - includes GPS data captured at shutter time
   let imageUrls: string[] = [];
-  let photoMetadata: { url: string; type: string; capturedAt: string }[] = [];
+  let photoMetadata: { url: string; type: string; capturedAt: string; lat?: number; lng?: number; accuracy?: number }[] = [];
   if (imagesJson) {
     try {
       const images = JSON.parse(imagesJson);
@@ -137,9 +137,9 @@ export async function updateWorkLog(id: string, formData: FormData) {
   const notes = formData.get('notes') as string;
   const imagesJson = formData.get('images') as string;
 
-  // Parse images
+  // Parse images - includes GPS data captured at shutter time
   let imageUrls: string[] = [];
-  let photoMetadata: { url: string; type: string; capturedAt: string }[] = [];
+  let photoMetadata: { url: string; type: string; capturedAt: string; lat?: number; lng?: number; accuracy?: number }[] = [];
   if (imagesJson) {
     try {
       const images = JSON.parse(imagesJson);
