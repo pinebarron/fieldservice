@@ -16,3 +16,16 @@ vite.config.ts.*
 # Next.js
 .next/
 out/
+
+# Capacitor/Mobile
+ios/App/App/public/
+ios/App/Pods/
+ios/App/App.xcworkspace/xcuserdata/
+ios/App/DerivedData/
+android/app/src/main/assets/public/
+android/.gradle/
+android/app/build/
+android/build/
+android/local.properties
+*.keystore
+*.jks

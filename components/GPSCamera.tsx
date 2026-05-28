@@ -3,6 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { embedExifData } from '@/lib/exif';
+import { Capacitor } from '@capacitor/core';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
+import { Geolocation } from '@capacitor/geolocation';
 
 export interface CapturedPhoto {
   blob: Blob;
@@ -19,6 +22,9 @@ interface GPSCameraProps {
   onClose: () => void;
 }
 
+// Check if running on native platform
+const isNative = Capacitor.isNativePlatform();
+
 export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -26,45 +32,173 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
 
   const [cameraReady, setCameraReady] = useState(false);
   const [gpsStatus, setGpsStatus] = useState<'pending' | 'acquired' | 'denied' | 'unavailable'>('pending');
-  const [currentPosition, setCurrentPosition] = useState<GeolocationPosition | null>(null);
+  const [currentPosition, setCurrentPosition] = useState<{ lat: number; lng: number; accuracy: number; altitude: number | null } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
 
   // Start GPS tracking
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setGpsStatus('unavailable');
-      return;
-    }
+    let watchId: string | number | undefined;
 
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        setCurrentPosition(position);
-        setGpsStatus('acquired');
-      },
-      (err) => {
-        console.error('GPS error:', err);
-        if (err.code === err.PERMISSION_DENIED) {
-          setGpsStatus('denied');
-        } else {
+    const startGpsTracking = async () => {
+      if (isNative) {
+        // Use Capacitor Geolocation for native
+        try {
+          const permission = await Geolocation.requestPermissions();
+          if (permission.location === 'denied') {
+            setGpsStatus('denied');
+            return;
+          }
+
+          watchId = await Geolocation.watchPosition(
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 10000 },
+            (position, err) => {
+              if (err) {
+                console.error('GPS error:', err);
+                if (err.message?.includes('denied')) {
+                  setGpsStatus('denied');
+                }
+                return;
+              }
+              if (position) {
+                setCurrentPosition({
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                  altitude: position.coords.altitude,
+                });
+                setGpsStatus('acquired');
+              }
+            }
+          );
+        } catch (err) {
+          console.error('Geolocation error:', err);
           setGpsStatus('unavailable');
         }
-      },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 10000,
+      } else {
+        // Use web geolocation API
+        if (!navigator.geolocation) {
+          setGpsStatus('unavailable');
+          return;
+        }
+
+        watchId = navigator.geolocation.watchPosition(
+          (position) => {
+            setCurrentPosition({
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              altitude: position.coords.altitude,
+            });
+            setGpsStatus('acquired');
+          },
+          (err) => {
+            console.error('GPS error:', err.code, err.message);
+            if (err.code === err.PERMISSION_DENIED) {
+              setGpsStatus('denied');
+            } else if (err.code === err.TIMEOUT) {
+              console.log('GPS timeout, will keep trying...');
+            } else {
+              setGpsStatus('unavailable');
+            }
+          },
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 30000 }
+        );
       }
-    );
+    };
+
+    startGpsTracking();
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
+      if (watchId !== undefined) {
+        if (isNative && typeof watchId === 'string') {
+          Geolocation.clearWatch({ id: watchId });
+        } else if (typeof watchId === 'number') {
+          navigator.geolocation.clearWatch(watchId);
+        }
+      }
     };
   }, []);
 
-  // Start camera
+  // Native camera capture
+  const captureWithNativeCamera = async () => {
+    setCapturing(true);
+    try {
+      const photo = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: false,
+        resultType: CameraResultType.Base64,
+        source: CameraSource.Camera,
+        correctOrientation: true,
+        saveToGallery: false,
+      });
+
+      if (!photo.base64String) {
+        throw new Error('No photo data received');
+      }
+
+      // Convert base64 to blob
+      const byteCharacters = atob(photo.base64String);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      let blob = new Blob([byteArray], { type: `image/${photo.format || 'jpeg'}` });
+
+      const captureTime = new Date();
+      const capturedAt = captureTime.toISOString();
+      const lat = currentPosition?.lat ?? null;
+      const lng = currentPosition?.lng ?? null;
+      const accuracy = currentPosition?.accuracy ?? null;
+      const altitude = currentPosition?.altitude ?? null;
+
+      // Embed EXIF data if GPS is available
+      let hasExif = false;
+      if (lat !== null && lng !== null) {
+        try {
+          blob = await embedExifData(blob, {
+            gps: {
+              lat,
+              lng,
+              altitude: altitude ?? undefined,
+              accuracy: accuracy ?? undefined,
+            },
+            timestamp: captureTime,
+            software: 'FieldService GPS Camera',
+          });
+          hasExif = true;
+        } catch (exifError) {
+          console.error('EXIF embedding failed:', exifError);
+        }
+      }
+
+      onCapture({
+        blob,
+        lat,
+        lng,
+        accuracy,
+        altitude,
+        capturedAt,
+        hasExif,
+      });
+    } catch (err) {
+      console.error('Native capture error:', err);
+      setError('Failed to capture photo');
+    } finally {
+      setCapturing(false);
+    }
+  };
+
+  // Start web camera
   const startCamera = useCallback(async () => {
+    if (isNative) {
+      // Native camera opens on demand, mark as ready
+      setCameraReady(true);
+      return;
+    }
+
     try {
       // Stop existing stream if any
       if (streamRef.current) {
@@ -105,13 +239,18 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
     };
   }, [startCamera]);
 
-  // Toggle camera facing mode
+  // Toggle camera facing mode (web only)
   const toggleCamera = async () => {
     setFacingMode(prev => prev === 'environment' ? 'user' : 'environment');
   };
 
-  // Capture photo
+  // Capture photo (web)
   const capturePhoto = async () => {
+    if (isNative) {
+      await captureWithNativeCamera();
+      return;
+    }
+
     if (!videoRef.current || !canvasRef.current || !cameraReady) return;
 
     setCapturing(true);
@@ -147,10 +286,10 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
       // Capture GPS at this exact moment
       const captureTime = new Date();
       const capturedAt = captureTime.toISOString();
-      const lat = currentPosition?.coords.latitude ?? null;
-      const lng = currentPosition?.coords.longitude ?? null;
-      const accuracy = currentPosition?.coords.accuracy ?? null;
-      const altitude = currentPosition?.coords.altitude ?? null;
+      const lat = currentPosition?.lat ?? null;
+      const lng = currentPosition?.lng ?? null;
+      const accuracy = currentPosition?.accuracy ?? null;
+      const altitude = currentPosition?.altitude ?? null;
 
       // Embed EXIF data if GPS is available
       let hasExif = false;
@@ -196,7 +335,7 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
       acquired: {
         color: 'bg-green-500',
         text: currentPosition
-          ? `GPS ±${Math.round(currentPosition.coords.accuracy)}m`
+          ? `GPS ±${Math.round(currentPosition.accuracy)}m`
           : 'GPS Ready',
         animate: false
       },
@@ -228,6 +367,54 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
     );
   }
 
+  // Native platform: show simplified capture button
+  if (isNative) {
+    return (
+      <div className="fixed inset-0 z-50 bg-black flex flex-col">
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="mb-6">
+              <GpsIndicator />
+            </div>
+            <button
+              onClick={capturePhoto}
+              disabled={capturing}
+              className={`
+                w-24 h-24 rounded-full border-4 border-white
+                flex items-center justify-center mx-auto
+                transition-all duration-150
+                ${capturing ? 'bg-white/50' : 'bg-white/20 hover:bg-white/30 active:scale-95'}
+                disabled:opacity-50
+              `}
+            >
+              <div className={`w-20 h-20 rounded-full bg-white ${capturing ? 'scale-90' : ''} transition-transform flex items-center justify-center`}>
+                <i className="fas fa-camera text-3xl text-gray-800"></i>
+              </div>
+            </button>
+            <p className="text-white mt-6">Tap to open camera</p>
+          </div>
+        </div>
+
+        <div className="bg-black/90 p-4 pb-8 safe-area-inset-bottom flex justify-center">
+          <Button onClick={onClose} variant="secondary">
+            Cancel
+          </Button>
+        </div>
+
+        {gpsStatus !== 'acquired' && (
+          <div className="absolute bottom-24 left-0 right-0 text-center">
+            <p className="text-yellow-400 text-xs">
+              {gpsStatus === 'pending' && 'Waiting for GPS signal...'}
+              {gpsStatus === 'denied' && 'Location access denied. Photo will not have GPS data.'}
+              {gpsStatus === 'unavailable' && 'GPS not available. Photo will not have GPS data.'}
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Web platform: show video preview
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
       {/* Hidden canvas for capture */}
