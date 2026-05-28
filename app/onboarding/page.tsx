@@ -1,15 +1,32 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { createBusiness } from './actions';
+import { getEnabledIndustries, type IndustryConfig } from '@/lib/industries';
 
-export default function OnboardingPage() {
+function OnboardingForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [enabledIndustries, setEnabledIndustries] = useState<IndustryConfig[]>([]);
+  const [selectedIndustry, setSelectedIndustry] = useState<string>('');
+
+  useEffect(() => {
+    const industries = getEnabledIndustries();
+    setEnabledIndustries(industries);
+
+    // Check for industry in URL params (from landing page signup)
+    const urlIndustry = searchParams.get('industry');
+    if (urlIndustry && industries.some(i => i.id === urlIndustry)) {
+      setSelectedIndustry(urlIndustry);
+    } else if (industries.length === 1) {
+      setSelectedIndustry(industries[0].id);
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -17,13 +34,14 @@ export default function OnboardingPage() {
     setError('');
 
     const formData = new FormData(e.currentTarget);
+    formData.set('industry', selectedIndustry || 'solar');
     const result = await createBusiness(formData);
 
     if (result?.error) {
       setError(result.error);
       setLoading(false);
     }
-    // If successful, the server action redirects to /dashboard
+    // If successful, the server action redirects to /schedule
   };
 
   return (
@@ -46,6 +64,34 @@ export default function OnboardingPage() {
                 {error && (
                   <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
                     {error}
+                  </div>
+                )}
+
+                {/* Industry Selection - only show if multiple enabled */}
+                {enabledIndustries.length > 1 && (
+                  <div>
+                    <label className="block text-sm font-medium mb-2">
+                      What industry are you in? *
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      {enabledIndustries.map((industry) => (
+                        <button
+                          key={industry.id}
+                          type="button"
+                          onClick={() => setSelectedIndustry(industry.id)}
+                          className={`p-4 rounded-lg border-2 text-left transition-all ${
+                            selectedIndustry === industry.id
+                              ? 'border-primary bg-primary/5'
+                              : 'border-input hover:border-primary/50'
+                          }`}
+                        >
+                          <i className={`fas ${industry.icon} text-xl mb-2 ${
+                            selectedIndustry === industry.id ? 'text-primary' : 'text-muted-foreground'
+                          }`}></i>
+                          <p className="font-medium text-sm">{industry.name}</p>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -149,5 +195,17 @@ export default function OnboardingPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function OnboardingPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center">
+        <i className="fas fa-spinner fa-spin text-2xl text-primary"></i>
+      </div>
+    }>
+      <OnboardingForm />
+    </Suspense>
   );
 }

@@ -13,6 +13,9 @@ interface WorkLog {
   zip_code: string;
   service_date: string;
   status: string;
+  // Pre-geocoded coordinates from server
+  job_lat?: number | null;
+  job_lng?: number | null;
 }
 
 interface MapPin {
@@ -84,7 +87,8 @@ async function geocodeAddress(location: string, city: string, state: string, zip
         return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
       }
     } catch (e) {
-      console.error('Geocoding error for query:', query, e);
+      // Silently fail - Nominatim can fail due to rate limits or CORS
+      // Server-side geocoding (job_lat/job_lng) is the primary source
     }
   }
 
@@ -143,15 +147,27 @@ function JobMapInner({ workLogs, height = "300px", className, onPinClick }: JobM
         maxZoom: 19,
       }).addTo(map);
 
-      // Geocode all unique city+state+zip combos
+      // Use stored coordinates first, fall back to geocoding
       const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
       const pins: MapPin[] = [];
 
       for (const wl of workLogs) {
+        // Prefer pre-geocoded coordinates from server
+        if (wl.job_lat && wl.job_lng) {
+          pins.push({ lat: wl.job_lat, lng: wl.job_lng, workLog: wl });
+          continue;
+        }
+
+        // Fall back to client-side geocoding (may fail due to rate limits/CORS)
         const key = `${wl.location_name},${wl.city},${wl.state},${wl.zip_code}`;
         if (!geocodeCache.has(key)) {
-          const coords = await geocodeAddress(wl.location_name, wl.city, wl.state, wl.zip_code);
-          geocodeCache.set(key, coords);
+          try {
+            const coords = await geocodeAddress(wl.location_name, wl.city, wl.state, wl.zip_code);
+            geocodeCache.set(key, coords);
+          } catch (e) {
+            // Silently fail - geocoding is best-effort on client
+            geocodeCache.set(key, null);
+          }
         }
         const coords = geocodeCache.get(key);
         if (coords) pins.push({ ...coords, workLog: wl });

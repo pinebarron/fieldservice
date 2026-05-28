@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { updateBusinessInfo, updateBusinessLogo } from './actions';
@@ -368,6 +369,35 @@ export function SettingsClient({ business, userEmail, userProfile }: Props) {
                   : '—'}
               </p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Beta Features */}
+      <Card className="border-dashed">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <h3 className="text-lg font-semibold">Beta Features</h3>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-700 font-medium">
+              Experimental
+            </span>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            These features are still in development and may change.
+          </p>
+          <div className="space-y-2">
+            <Link href="/vendors">
+              <div className="flex items-center gap-3 p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer">
+                <div className="w-10 h-10 bg-muted rounded-lg flex items-center justify-center">
+                  <i className="fas fa-handshake text-muted-foreground"></i>
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">Vendors</p>
+                  <p className="text-sm text-muted-foreground">Manage supplier and vendor relationships</p>
+                </div>
+                <i className="fas fa-chevron-right text-muted-foreground"></i>
+              </div>
+            </Link>
           </div>
         </CardContent>
       </Card>

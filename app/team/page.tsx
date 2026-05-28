@@ -5,15 +5,20 @@ import { AppHeader } from '@/components/AppHeader';
 import { TeamClient } from './TeamClient';
 
 export default async function TeamPage() {
-  const { user, userProfile, business } = await getUserAndBusiness();
+  const { user, userProfile, business, role } = await getUserAndBusiness();
 
   if (!user) redirect('/login');
   if (!business) redirect('/onboarding');
 
+  // Redirect technicians to tech dashboard
+  if (role === 'technician') {
+    redirect('/tech');
+  }
+
   const adminClient = createAdminClient();
   const { data: members } = await adminClient
     .from('business_members')
-    .select(`id, role, user:users(id, email, first_name, last_name, profile_image_url)`)
+    .select(`id, role, title, phone, invite_accepted_at, user:users(id, email, first_name, last_name, profile_image_url)`)
     .eq('business_id', business.id);
 
   return (

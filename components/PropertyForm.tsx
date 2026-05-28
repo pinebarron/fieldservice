@@ -2,24 +2,62 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { createProperty } from '@/app/properties/actions';
+import { createProperty, updateProperty } from '@/app/properties/actions';
+
+interface Property {
+  id: string;
+  property_name: string;
+  customer_name: string;
+  location_name: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  status: string;
+  notes: string | null;
+}
 
 interface PropertyFormProps {
   onClose: () => void;
   onSuccess: () => void;
+  editProperty?: Property;
 }
 
-export function PropertyForm({ onClose, onSuccess }: PropertyFormProps) {
+export function PropertyForm({ onClose, onSuccess, editProperty }: PropertyFormProps) {
+  const isEditMode = !!editProperty;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Form state
+  const [propertyName, setPropertyName] = useState(editProperty?.property_name || '');
+  const [customerName, setCustomerName] = useState(editProperty?.customer_name || '');
+  const [locationName, setLocationName] = useState(editProperty?.location_name || '');
+  const [city, setCity] = useState(editProperty?.city || '');
+  const [state, setState] = useState(editProperty?.state || '');
+  const [zipCode, setZipCode] = useState(editProperty?.zip_code || '');
+  const [notes, setNotes] = useState(editProperty?.notes || '');
+  const [status, setStatus] = useState(editProperty?.status || 'active');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
-    const formData = new FormData(e.currentTarget);
-    const result = await createProperty(formData);
+    const formData = new FormData();
+    formData.set('propertyName', propertyName);
+    formData.set('customerName', customerName);
+    formData.set('locationName', locationName);
+    formData.set('city', city);
+    formData.set('state', state);
+    formData.set('zipCode', zipCode);
+    formData.set('notes', notes);
+    formData.set('status', status);
+
+    let result;
+    if (isEditMode && editProperty) {
+      result = await updateProperty(editProperty.id, formData);
+    } else {
+      result = await createProperty(formData);
+    }
 
     if (result?.error) {
       setError(result.error);
@@ -41,38 +79,43 @@ export function PropertyForm({ onClose, onSuccess }: PropertyFormProps) {
       <div>
         <label className="block text-sm font-medium mb-1">Property Name *</label>
         <input
-          name="propertyName"
+          value={propertyName}
+          onChange={(e) => setPropertyName(e.target.value)}
           required
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="Main Office Building"
+          placeholder="Smith Residence"
+        />
+        <p className="text-xs text-muted-foreground mt-1">A friendly name to identify this property</p>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Main Point of Contact *</label>
+        <input
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          required
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          placeholder="John Smith"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Customer Name *</label>
+        <label className="block text-sm font-medium mb-1">Street Address *</label>
         <input
-          name="customerName"
+          value={locationName}
+          onChange={(e) => setLocationName(e.target.value)}
           required
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="Acme Corporation"
+          placeholder="123 Main St"
         />
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">Location Name *</label>
-        <input
-          name="locationName"
-          required
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="Downtown Branch"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">City *</label>
           <input
-            name="city"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
             required
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="Los Angeles"
@@ -81,28 +124,44 @@ export function PropertyForm({ onClose, onSuccess }: PropertyFormProps) {
         <div>
           <label className="block text-sm font-medium mb-1">State *</label>
           <input
-            name="state"
+            value={state}
+            onChange={(e) => setState(e.target.value)}
             required
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             placeholder="CA"
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">ZIP *</label>
+          <input
+            value={zipCode}
+            onChange={(e) => setZipCode(e.target.value)}
+            required
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            placeholder="90001"
+          />
+        </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium mb-1">ZIP Code *</label>
-        <input
-          name="zipCode"
-          required
-          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          placeholder="90001"
-        />
-      </div>
+      {isEditMode && (
+        <div>
+          <label className="block text-sm font-medium mb-1">Status</label>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      )}
 
       <div>
         <label className="block text-sm font-medium mb-1">Notes</label>
         <textarea
-          name="notes"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           rows={3}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           placeholder="Additional notes..."
@@ -114,7 +173,7 @@ export function PropertyForm({ onClose, onSuccess }: PropertyFormProps) {
           Cancel
         </Button>
         <Button type="submit" disabled={loading} className="flex-1">
-          {loading ? 'Creating...' : 'Create Property'}
+          {loading ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Property')}
         </Button>
       </div>
     </form>

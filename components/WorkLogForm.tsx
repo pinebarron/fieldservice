@@ -1,10 +1,19 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { createWorkLog } from '@/app/schedule/actions';
-import { uploadImage } from '@/app/schedule/upload-action';
-import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
+import { createWorkLog, updateWorkLog } from '@/app/schedule/actions';
+import { FormPhotoField } from '@/components/FormPhotoField';
+import { FormDocumentField } from '@/components/FormDocumentField';
+import { SignatureCanvas } from '@/components/SignatureCanvas';
+import type { FormPhotoValue, PhotoFieldConfig, FormDocumentValue, DocumentFieldConfig } from '@/lib/form-types';
+
+// Conditional display rule
+type ShowIfCondition = {
+  field: string;
+  operator: 'equals' | 'notEquals' | 'contains' | 'isNotEmpty' | 'isEmpty';
+  value?: string | boolean;
+};
 
 type FormField = {
   id: string;
@@ -13,6 +22,9 @@ type FormField = {
   required?: boolean;
   options?: { label: string; value: string }[];
   sectionId?: string;
+  photoConfig?: PhotoFieldConfig;
+  documentConfig?: DocumentFieldConfig;
+  showIf?: ShowIfCondition;
 };
 
 type FormSection = {
@@ -37,11 +49,57 @@ type Property = {
   zip_code: string;
 };
 
+type FormSubmission = {
+  id: string;
+  template_id: string;
+  responses: Record<string, unknown>;
+  submitted_at: string;
+  form_templates?: {
+    name: string;
+    schema: { fields: FormField[]; sections?: FormSection[] };
+  };
+};
+
+type WorkLog = {
+  id: string;
+  customer_name: string;
+  work_type: string;
+  location_name: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  service_date: string;
+  status: string;
+  work_performed: string;
+  additional_notes: string | null;
+  image_urls: string[] | null;
+  photo_metadata: { url: string; type: string; capturedAt: string; lat?: number; lng?: number; accuracy?: number }[] | null;
+  form_submissions?: FormSubmission[];
+  property_id?: string | null;
+  technician_user_id?: string | null;
+};
+
+type TeamMember = {
+  id: string;
+  userId: string;
+  role: string;
+  user: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+  } | null;
+};
+
 interface WorkLogFormProps {
   onClose: () => void;
   onSuccess: () => void;
   formTemplates?: FormTemplate[];
   properties?: Property[];
+  teamMembers?: TeamMember[];
+  editJob?: WorkLog;
+  defaultCity?: string;
+  defaultState?: string;
 }
 
 const WORK_TYPES = [
@@ -56,24 +114,123 @@ const WORK_TYPES = [
   'Other',
 ];
 
-export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties = [] }: WorkLogFormProps) {
+// Evaluate whether a field should be shown based on its showIf condition
+function evaluateShowIf(condition: ShowIfCondition | undefined, formResponses: Record<string, any>): boolean {
+  if (!condition) return true; // No condition = always show
+  if (!condition.field) return true; // No field selected = always show
+
+  const fieldValue = formResponses[condition.field];
+  let conditionValue = condition.value;
+
+  // Normalize boolean comparisons (handle string "true"/"false" vs actual booleans)
+  if (conditionValue === 'true') conditionValue = true;
+  if (conditionValue === 'false') conditionValue = false;
+
+  // Also normalize the field value for comparison
+  let normalizedFieldValue = fieldValue;
+  if (normalizedFieldValue === 'true') normalizedFieldValue = true;
+  if (normalizedFieldValue === 'false') normalizedFieldValue = false;
+
+  switch (condition.operator) {
+    case 'equals':
+      // For checkboxes, treat undefined/null as false
+      if (conditionValue === true) {
+        return normalizedFieldValue === true;
+      }
+      if (conditionValue === false) {
+        return normalizedFieldValue === false || normalizedFieldValue === undefined || normalizedFieldValue === null;
+      }
+      return normalizedFieldValue === conditionValue;
+    case 'notEquals':
+      if (conditionValue === true) {
+        return normalizedFieldValue !== true;
+      }
+      if (conditionValue === false) {
+        return normalizedFieldValue === true;
+      }
+      return normalizedFieldValue !== conditionValue;
+    case 'contains':
+      return typeof fieldValue === 'string' && fieldValue.includes(String(condition.value));
+    case 'isNotEmpty':
+      return fieldValue !== undefined && fieldValue !== null && fieldValue !== '' &&
+             !(Array.isArray(fieldValue) && fieldValue.length === 0);
+    case 'isEmpty':
+      return fieldValue === undefined || fieldValue === null || fieldValue === '' ||
+             (Array.isArray(fieldValue) && fieldValue.length === 0);
+    default:
+      return true;
+  }
+}
+
+export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties = [], teamMembers = [], editJob, defaultCity = '', defaultState = '' }: WorkLogFormProps) {
+  const isEditMode = !!editJob;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [selectedWorkType, setSelectedWorkType] = useState(WORK_TYPES[0]);
+  const [selectedWorkType, setSelectedWorkType] = useState(editJob?.work_type || WORK_TYPES[0]);
   const [selectedForm, setSelectedForm] = useState<FormTemplate | null>(null);
   const [formResponses, setFormResponses] = useState<Record<string, any>>({});
-  const [images, setImages] = useState<UploadedImage[]>([]);
+  const [formInitialized, setFormInitialized] = useState(false);
 
   // Form field values (controlled for property auto-fill)
-  const [customerName, setCustomerName] = useState('');
-  const [locationName, setLocationName] = useState('');
-  const [city, setCity] = useState('');
-  const [state, setState] = useState('');
-  const [zipCode, setZipCode] = useState('');
-  const [selectedPropertyId, setSelectedPropertyId] = useState('');
+  const [customerName, setCustomerName] = useState(editJob?.customer_name || '');
+  const [locationName, setLocationName] = useState(editJob?.location_name || '');
+  const [city, setCity] = useState(editJob?.city || defaultCity);
+  const [state, setState] = useState(editJob?.state || defaultState);
+  const [zipCode, setZipCode] = useState(editJob?.zip_code || '');
+  const [selectedPropertyId, setSelectedPropertyId] = useState(editJob?.property_id || '');
+  const [serviceDate, setServiceDate] = useState(editJob?.service_date || new Date().toISOString().split('T')[0]);
+  const [status, setStatus] = useState(editJob?.status || 'scheduled');
+  const [workPerformed, setWorkPerformed] = useState(editJob?.work_performed || '');
+  const [notes, setNotes] = useState(editJob?.additional_notes || '');
+  const [assignedTo, setAssignedTo] = useState(editJob?.technician_user_id || '');
+  const [saveAsProperty, setSaveAsProperty] = useState(false);
 
-  // Auto-select form when work type changes
+  // Initialize form from editJob (only once)
   useEffect(() => {
+    if (editJob && !formInitialized) {
+      // Check if there's a form submission to restore
+      const submission = editJob.form_submissions?.[0];
+      if (submission) {
+        // Find the matching form template
+        const matchingTemplate = formTemplates.find(f => f.id === submission.template_id);
+        if (matchingTemplate) {
+          setSelectedForm(matchingTemplate);
+          // Restore form responses including photos
+          const restoredResponses: Record<string, any> = { ...submission.responses as Record<string, any> };
+          setFormResponses(restoredResponses);
+        }
+      } else {
+        // No form submission - restore legacy photos into default photo fields
+        if (editJob.photo_metadata && editJob.photo_metadata.length > 0) {
+          const beforePhotos = editJob.photo_metadata.filter(p => p.type === 'before').map(p => ({
+            url: p.url,
+            capturedAt: p.capturedAt,
+            lat: p.lat,
+            lng: p.lng,
+            accuracy: p.accuracy,
+          }));
+          const afterPhotos = editJob.photo_metadata.filter(p => p.type === 'after').map(p => ({
+            url: p.url,
+            capturedAt: p.capturedAt,
+            lat: p.lat,
+            lng: p.lng,
+            accuracy: p.accuracy,
+          }));
+          setFormResponses({
+            _default_before_photos: beforePhotos,
+            _default_after_photos: afterPhotos,
+          });
+        }
+      }
+      setFormInitialized(true);
+    }
+  }, [editJob, formTemplates, formInitialized]);
+
+  // Auto-select form when work type changes (only for new jobs)
+  useEffect(() => {
+    if (isEditMode && !formInitialized) return; // Skip during edit initialization
+    if (isEditMode) return; // Don't auto-switch forms in edit mode
+
     const matchingForm = formTemplates.find(f => f.work_type === selectedWorkType);
     if (matchingForm) {
       setSelectedForm(matchingForm);
@@ -82,7 +239,7 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
       setSelectedForm(null);
       setFormResponses({});
     }
-  }, [selectedWorkType, formTemplates]);
+  }, [selectedWorkType, formTemplates, isEditMode, formInitialized]);
 
   const handlePropertySelect = (propertyId: string) => {
     setSelectedPropertyId(propertyId);
@@ -115,14 +272,46 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
 
     const formData = new FormData(e.currentTarget);
 
+    // Include form template ID and responses
     if (selectedForm) {
       formData.set('formTemplateId', selectedForm.id);
       formData.set('formResponses', JSON.stringify(formResponses));
+    } else {
+      // When no form template, include default photo fields in responses
+      formData.set('formResponses', JSON.stringify(formResponses));
     }
 
-    // Add images
-    if (images.length > 0) {
-      formData.set('images', JSON.stringify(images));
+    // Extract photos from form responses (only from form templates)
+    const allPhotos: { url: string; type: string; fieldLabel: string; capturedAt: string; lat?: number; lng?: number; accuracy?: number; altitude?: number; hasExif?: boolean }[] = [];
+    const photoFieldIds = selectedForm
+      ? selectedForm.schema.fields.filter(f => f.type === 'photo').map(f => f.id)
+      : [];
+
+    for (const fieldId of photoFieldIds) {
+      const photos = formResponses[fieldId] as FormPhotoValue[] | undefined;
+      if (photos && Array.isArray(photos)) {
+        // Determine photo type and label from field
+        const field = selectedForm?.schema.fields.find(f => f.id === fieldId);
+        const photoType = field?.photoConfig?.classification || 'general';
+        const fieldLabel = field?.label || 'Photos';
+
+        allPhotos.push(...photos.map(p => ({
+          url: p.url,
+          type: photoType,
+          fieldLabel: fieldLabel,
+          capturedAt: p.capturedAt,
+          lat: p.lat,
+          lng: p.lng,
+          accuracy: p.accuracy,
+          altitude: p.altitude,
+          hasExif: p.hasExif,
+        })));
+      }
+    }
+
+    // Add photos in legacy format for backwards compatibility
+    if (allPhotos.length > 0) {
+      formData.set('images', JSON.stringify(allPhotos));
     }
 
     // Add property ID if selected
@@ -130,7 +319,22 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
       formData.set('propertyId', selectedPropertyId);
     }
 
-    const result = await createWorkLog(formData);
+    // Add assigned technician
+    if (assignedTo) {
+      formData.set('assignedTo', assignedTo);
+    }
+
+    // Add save as property flag
+    if (saveAsProperty && !selectedPropertyId) {
+      formData.set('saveAsProperty', 'true');
+    }
+
+    let result;
+    if (isEditMode && editJob) {
+      result = await updateWorkLog(editJob.id, formData);
+    } else {
+      result = await createWorkLog(formData);
+    }
 
     if (result?.error) {
       setError(result.error);
@@ -140,8 +344,6 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
       onClose();
     }
   };
-
-  const today = new Date().toISOString().split('T')[0];
 
   const renderFormField = (field: FormField) => {
     const value = formResponses[field.id] || '';
@@ -243,86 +445,34 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
           </label>
         );
       case 'photo':
-        const photoUrl = value as string;
-        const photoInputId = `photo-input-${field.id}`;
+        const photoValue = (value as FormPhotoValue[] | undefined) || [];
         return (
-          <div className="space-y-2">
-            {photoUrl ? (
-              <div className="relative inline-block">
-                <img src={photoUrl} alt={field.label} className="w-32 h-32 object-cover rounded-lg border" />
-                <button
-                  type="button"
-                  onClick={() => handleFieldChange(field.id, '')}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full text-xs flex items-center justify-center"
-                >
-                  <i className="fas fa-times"></i>
-                </button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input
-                  id={photoInputId}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    const result = await uploadImage(formData);
-                    if (result.url) {
-                      handleFieldChange(field.id, result.url);
-                    }
-                    e.target.value = '';
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => document.getElementById(photoInputId)?.click()}
-                >
-                  <i className="fas fa-camera mr-2"></i>
-                  Take Photo
-                </Button>
-                <input
-                  id={`${photoInputId}-file`}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    const result = await uploadImage(formData);
-                    if (result.url) {
-                      handleFieldChange(field.id, result.url);
-                    }
-                    e.target.value = '';
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => document.getElementById(`${photoInputId}-file`)?.click()}
-                >
-                  <i className="fas fa-upload mr-2"></i>
-                  Upload
-                </Button>
-              </div>
-            )}
-          </div>
+          <FormPhotoField
+            field={field as any}
+            value={photoValue}
+            onChange={(photos) => handleFieldChange(field.id, photos)}
+            jobLocation={undefined} // TODO: Pass geocoded job location when available
+            disabled={loading}
+          />
+        );
+      case 'document':
+        const documentValue = (value as FormDocumentValue[] | undefined) || [];
+        return (
+          <FormDocumentField
+            field={field as any}
+            value={documentValue}
+            onChange={(documents) => handleFieldChange(field.id, documents)}
+            disabled={loading}
+          />
         );
       case 'signature':
         return (
-          <div className="border-2 border-dashed rounded-md p-4 text-center text-muted-foreground">
-            <i className="fas fa-signature text-2xl mb-2"></i>
-            <p className="text-sm">Signature capture (coming soon)</p>
-          </div>
+          <SignatureCanvas
+            value={formResponses[field.id] as string | undefined}
+            onChange={(sig) => handleFieldChange(field.id, sig)}
+            disabled={loading}
+            label={field.label}
+          />
         );
       case 'gps':
         const gpsValue = value as { lat: number; lng: number } | null;
@@ -420,14 +570,14 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
 
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Customer Name *</label>
+          <label className="block text-sm font-medium mb-1">Main Point of Contact *</label>
           <input
             name="customerName"
             required
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            placeholder="Customer name"
+            placeholder="John Smith"
           />
         </div>
         <div>
@@ -447,14 +597,14 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">Location Name *</label>
+        <label className="block text-sm font-medium mb-1">Street Address *</label>
         <input
           name="locationName"
           required
           value={locationName}
           onChange={(e) => setLocationName(e.target.value)}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          placeholder="Job site name"
+          placeholder="123 Main St"
         />
       </div>
 
@@ -494,6 +644,22 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
         </div>
       </div>
 
+      {/* Save as Property option - only show for new jobs without a property selected */}
+      {!isEditMode && !selectedPropertyId && (
+        <label className="flex items-center gap-2 cursor-pointer p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+          <input
+            type="checkbox"
+            checked={saveAsProperty}
+            onChange={(e) => setSaveAsProperty(e.target.checked)}
+            className="rounded border-input"
+          />
+          <span className="text-sm">
+            <i className="fas fa-building text-primary mr-1"></i>
+            Save customer info as a new Property
+          </span>
+        </label>
+      )}
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium mb-1">Service Date *</label>
@@ -501,7 +667,8 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
             name="serviceDate"
             type="date"
             required
-            defaultValue={today}
+            value={serviceDate}
+            onChange={(e) => setServiceDate(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           />
         </div>
@@ -509,6 +676,8 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
           <label className="block text-sm font-medium mb-1">Status</label>
           <select
             name="status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
             <option value="scheduled">Scheduled</option>
@@ -518,14 +687,38 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
         </div>
       </div>
 
+      {/* Technician Assignment */}
+      {teamMembers.length > 0 && (
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            <i className="fas fa-user-hard-hat text-primary mr-2"></i>
+            Assign To
+          </label>
+          <select
+            value={assignedTo}
+            onChange={(e) => setAssignedTo(e.target.value)}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Unassigned</option>
+            {teamMembers.map(member => (
+              <option key={member.userId} value={member.userId}>
+                {member.user?.first_name || member.user?.email?.split('@')[0] || 'Unknown'} {member.user?.last_name || ''}
+                {member.role === 'owner' ? ' (Owner)' : member.role === 'admin' ? ' (Admin)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <div>
-        <label className="block text-sm font-medium mb-1">Work Performed *</label>
+        <label className="block text-sm font-medium mb-1">Work Overview</label>
         <textarea
           name="workPerformed"
-          required
           rows={3}
+          value={workPerformed}
+          onChange={(e) => setWorkPerformed(e.target.value)}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-          placeholder="Describe the work performed..."
+          placeholder="Brief description of work to be done or completed..."
         />
       </div>
 
@@ -534,19 +727,13 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
         <textarea
           name="notes"
           rows={2}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           placeholder="Any additional notes..."
         />
       </div>
 
-      {/* Photo Upload */}
-      <div className="border-t pt-4">
-        <label className="block text-sm font-medium mb-3">
-          <i className="fas fa-camera text-primary mr-2"></i>
-          Photos (Before / After)
-        </label>
-        <ImageUpload images={images} onChange={setImages} maxImages={10} />
-      </div>
 
       {/* Form Template Selection */}
       {formTemplates.length > 0 && (
@@ -587,19 +774,27 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
             return (
               <>
                 {/* Unsectioned fields first */}
-                {unsectionedFields.map(field => (
-                  <div key={field.id}>
-                    <label className="block text-sm font-medium mb-1">
-                      {field.label} {field.required && <span className="text-destructive">*</span>}
-                    </label>
-                    {renderFormField(field)}
-                  </div>
-                ))}
+                {unsectionedFields.map(field => {
+                  // Check if field should be shown based on conditional logic
+                  if (!evaluateShowIf(field.showIf, formResponses)) {
+                    return null;
+                  }
+                  return (
+                    <div key={field.id} className="animate-in fade-in duration-200">
+                      <label className="block text-sm font-medium mb-1">
+                        {field.label} {field.required && <span className="text-destructive">*</span>}
+                      </label>
+                      {renderFormField(field)}
+                    </div>
+                  );
+                })}
 
                 {/* Then sectioned fields */}
                 {sections.map(section => {
                   const sectionFields = fields.filter(f => f.sectionId === section.id);
-                  if (sectionFields.length === 0) return null;
+                  // Filter to only visible fields in this section
+                  const visibleSectionFields = sectionFields.filter(f => evaluateShowIf(f.showIf, formResponses));
+                  if (visibleSectionFields.length === 0) return null;
 
                   return (
                     <div key={section.id} className="border-t pt-4 mt-4">
@@ -608,14 +803,20 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
                         {section.title}
                       </h5>
                       <div className="space-y-4">
-                        {sectionFields.map(field => (
-                          <div key={field.id}>
-                            <label className="block text-sm font-medium mb-1">
-                              {field.label} {field.required && <span className="text-destructive">*</span>}
-                            </label>
-                            {renderFormField(field)}
-                          </div>
-                        ))}
+                        {sectionFields.map(field => {
+                          // Check if field should be shown based on conditional logic
+                          if (!evaluateShowIf(field.showIf, formResponses)) {
+                            return null;
+                          }
+                          return (
+                            <div key={field.id} className="animate-in fade-in duration-200">
+                              <label className="block text-sm font-medium mb-1">
+                                {field.label} {field.required && <span className="text-destructive">*</span>}
+                              </label>
+                              {renderFormField(field)}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
@@ -631,7 +832,7 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
           Cancel
         </Button>
         <Button type="submit" disabled={loading} className="flex-1">
-          {loading ? 'Creating...' : 'Create Work Log'}
+          {loading ? (isEditMode ? 'Saving...' : 'Creating...') : (isEditMode ? 'Save Changes' : 'Create Work Log')}
         </Button>
       </div>
     </form>

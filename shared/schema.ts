@@ -26,11 +26,35 @@ export type PhotoMeta = {
   annotations?: PhotoAnnotation[];
 };
 
+// Form photo value - stored in form responses for photo fields
+export type FormPhotoValue = {
+  url: string;
+  jobPhotoId?: string;           // Reference to job_photos record
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
+  altitude?: number;
+  capturedAt: string;
+  hasExif?: boolean;
+  verificationStatus?: 'pending' | 'verified' | 'mismatch';
+  distanceFromJob?: number;
+};
+
 // Form field types for dynamic forms
 export type FormFieldType =
   | "text" | "textarea" | "number" | "date" | "time"
   | "select" | "multiselect" | "checkbox" | "radio"
   | "photo" | "signature" | "gps";
+
+// Photo field configuration for GPS-verified photos
+export type PhotoFieldConfig = {
+  gpsRequired?: boolean;           // Must capture with GPS
+  verifyLocation?: boolean;        // Verify against job site
+  verificationRadius?: number;     // Distance threshold in meters (default 100)
+  minPhotos?: number;              // Minimum required (default 0)
+  maxPhotos?: number;              // Maximum allowed (default 5)
+  classification?: 'before' | 'after' | 'general';  // For reporting/comparison
+};
 
 // Form field definition
 export type FormFieldDefinition = {
@@ -47,6 +71,7 @@ export type FormFieldDefinition = {
     maxLength?: number;
     pattern?: string;
   };
+  photoConfig?: PhotoFieldConfig;  // Only applies when type === 'photo'
 };
 
 // Logic rule for conditional form behavior
@@ -124,6 +149,11 @@ export const businessMembers = pgTable("business_members", {
   businessId: varchar("business_id").notNull().references(() => businesses.id),
   userId: varchar("user_id").notNull().references(() => users.id),
   role: text("role").notNull().default("technician"),
+  title: varchar("title", { length: 100 }),
+  phone: varchar("phone", { length: 20 }),
+  inviteToken: varchar("invite_token", { length: 64 }),
+  inviteSentAt: timestamp("invite_sent_at"),
+  inviteAcceptedAt: timestamp("invite_accepted_at"),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -131,10 +161,16 @@ export const businessMembers = pgTable("business_members", {
 export const vendors = pgTable("vendors", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   businessId: varchar("business_id").notNull().references(() => businesses.id),
+  vendorKey: varchar("vendor_key", { length: 50 }), // Unique identifier/code
   name: text("name").notNull(),
   contactName: text("contact_name"),
   contactEmail: text("contact_email"),
   contactPhone: text("contact_phone"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zipCode: varchar("zip_code", { length: 20 }),
+  lat: text("lat"), // Latitude for route optimization
+  lng: text("lng"), // Longitude for route optimization
   servicesProvided: json("services_provided").$type<string[]>().default([]),
   regionsServed: json("regions_served").$type<string[]>().default([]),
   insuranceProvider: text("insurance_provider"),

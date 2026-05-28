@@ -9,12 +9,10 @@ import { signOut } from "@/app/auth/actions";
 import type { User } from "@supabase/supabase-js";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Dashboard", icon: "fa-home" },
-  { href: "/schedule", label: "Schedule", icon: "fa-calendar-alt" },
+  { href: "/schedule", label: "Jobs", icon: "fa-calendar-alt" },
   { href: "/properties", label: "Properties", icon: "fa-building" },
   { href: "/estimates", label: "Estimates", icon: "fa-file-invoice-dollar" },
   { href: "/team", label: "Team", icon: "fa-users" },
-  { href: "/vendors", label: "Vendors", icon: "fa-handshake" },
   { href: "/pricing", label: "Pricing", icon: "fa-tag" },
   { href: "/forms", label: "Forms", icon: "fa-file-alt" },
   { href: "/settings", label: "Settings", icon: "fa-cog" },
@@ -34,7 +32,7 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
   const [open, setOpen] = useState(false);
 
   const isActive = (href: string) =>
-    href === "/dashboard" ? pathname === "/dashboard" : pathname?.startsWith(href);
+    href === "/schedule" ? pathname === "/schedule" : pathname?.startsWith(href);
 
   const firstName = userProfile?.firstName || user.email?.split('@')[0] || 'User';
   const lastName = userProfile?.lastName || '';
@@ -58,7 +56,7 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/dashboard">
+          <Link href="/schedule">
             <div className="flex items-center gap-3 cursor-pointer">
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
                 <i className="fas fa-clipboard-list text-primary-foreground text-xl"></i>
@@ -88,6 +86,14 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
+            {/* New Job button - always visible */}
+            <Link href="/schedule?new=true" className="hidden sm:block">
+              <Button size="sm" className="gap-2">
+                <i className="fas fa-plus"></i>
+                New Job
+              </Button>
+            </Link>
+
             {/* Desktop logout + user */}
             <div className="hidden lg:flex items-center gap-3">
               <form action={signOut}>
@@ -102,9 +108,6 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
                 </Button>
               </form>
               <UserAvatar />
-              <span className="text-sm font-medium text-foreground">
-                {firstName} {lastName}
-              </span>
             </div>
 
             {/* Mobile: avatar + hamburger */}
@@ -134,6 +137,16 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
                         </p>
                       </div>
                     </div>
+                  </div>
+
+                  {/* New Job button - mobile */}
+                  <div className="px-4 pt-4">
+                    <Link href="/schedule?new=true" onClick={() => setOpen(false)}>
+                      <Button className="w-full gap-2">
+                        <i className="fas fa-plus"></i>
+                        New Job
+                      </Button>
+                    </Link>
                   </div>
 
                   {/* Nav links */}

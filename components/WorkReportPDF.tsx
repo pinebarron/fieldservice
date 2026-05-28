@@ -212,10 +212,76 @@ function orderNum(id: string) {
   return "WO-" + id.replace(/-/g, "").slice(0, 8).toUpperCase();
 }
 
+// Format form field value for display in PDF
+function formatFieldValue(value: unknown, field: FormField): string {
+  if (value === null || value === undefined || value === '') {
+    return '—';
+  }
+
+  // Handle checkbox
+  if (field.type === 'checkbox') {
+    return value === true || value === 'true' ? 'Yes' : 'No';
+  }
+
+  // Handle select/radio - show option label instead of value
+  if ((field.type === 'select' || field.type === 'radio') && field.options) {
+    const option = field.options.find(opt => opt.value === value);
+    return option?.label || String(value);
+  }
+
+  // Handle multiselect - show comma-separated labels
+  if (field.type === 'multiselect' && Array.isArray(value) && field.options) {
+    return value
+      .map(v => field.options!.find(opt => opt.value === v)?.label || v)
+      .join(', ') || '—';
+  }
+
+  // Handle date
+  if (field.type === 'date' && typeof value === 'string') {
+    return fmtDate(value);
+  }
+
+  // Handle photo - just show count
+  if (field.type === 'photo' && Array.isArray(value)) {
+    return `${value.length} photo${value.length !== 1 ? 's' : ''} attached`;
+  }
+
+  // Handle GPS
+  if (field.type === 'gps' && typeof value === 'object' && value !== null) {
+    const gps = value as { lat?: number; lng?: number };
+    if (gps.lat && gps.lng) {
+      return `${gps.lat.toFixed(6)}, ${gps.lng.toFixed(6)}`;
+    }
+  }
+
+  // Default - convert to string
+  return String(value);
+}
+
 interface PhotoMeta {
   url: string;
   type: 'before' | 'after' | 'general';
+  fieldLabel?: string;
   capturedAt: string;
+}
+
+interface FormField {
+  id: string;
+  label: string;
+  type: string;
+  options?: { label: string; value: string }[];
+  sectionId?: string;
+}
+
+interface FormSubmission {
+  id: string;
+  template_id: string;
+  responses: Record<string, unknown>;
+  submitted_at: string;
+  form_templates?: {
+    name: string;
+    schema: { fields: FormField[]; sections?: { id: string; title: string }[] };
+  };
 }
 
 interface WorkLog {
@@ -233,29 +299,65 @@ interface WorkLog {
   work_performed: string;
   additional_notes: string | null;
   photo_metadata: PhotoMeta[] | null;
+  form_submissions?: FormSubmission[];
+}
+
+interface BusinessInfo {
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  phone?: string;
+  logoUrl?: string;
 }
 
 interface Props {
   workLog: WorkLog;
-  businessName?: string;
+  business?: BusinessInfo;
 }
 
-function WorkReportDocument({ workLog, businessName }: Props) {
+function WorkReportDocument({ workLog, business }: Props) {
+  const businessName = business?.name || 'FieldService';
   const photos = workLog.photo_metadata || [];
-  const before = photos.filter(p => p.type === "before");
-  const during = photos.filter(p => p.type === "general");
-  const after = photos.filter(p => p.type === "after");
+
+  // Group photos by fieldLabel (or fallback to type-based labels for legacy photos)
+  const photosByLabel = photos.reduce((acc, photo) => {
+    const label = photo.fieldLabel || (photo.type === 'before' ? 'Before Photos' : photo.type === 'after' ? 'After Photos' : 'Other Photos');
+    if (!acc[label]) {
+      acc[label] = { list: [], type: photo.type };
+    }
+    acc[label].list.push(photo);
+    return acc;
+  }, {} as Record<string, { list: PhotoMeta[]; type: string }>);
 
   const generatedAt = new Date().toLocaleString("en-US", {
     month: "short", day: "numeric", year: "numeric",
     hour: "numeric", minute: "2-digit", hour12: true,
   });
 
-  const zones = [
-    { list: before, label: "Before Work", bg: C.amber },
-    { list: during, label: "During Work", bg: C.blue },
-    { list: after, label: "After Complete", bg: C.green },
-  ].filter(z => z.list.length > 0);
+  // Create zones from grouped photos with appropriate colors
+  const zones = Object.entries(photosByLabel).map(([label, { list, type }]) => ({
+    list,
+    label,
+    bg: type === 'before' ? C.amber : type === 'after' ? C.green : C.blue,
+  }));
+
+  // Calculate section numbers dynamically
+  // 1. Customer & Site Information
+  // 2. Service Details
+  // 3. Work Performed
+  // 4. Additional Notes (if present)
+  // 5+. Form Submissions (one section each)
+  // Photo Documentation
+  // Certification
+  const formSubmissionCount = workLog.form_submissions?.length || 0;
+  let nextSectionNum = 4; // Start after "Work Performed"
+  if (workLog.additional_notes) nextSectionNum++;
+  const formSectionStart = nextSectionNum;
+  nextSectionNum += formSubmissionCount;
+  const photoSectionNum = zones.length > 0 ? nextSectionNum++ : 0;
+  const certSectionNum = nextSectionNum;
 
   return (
     <Document title={`Work Order — ${workLog.customer_name}`} author={businessName}>
@@ -263,8 +365,18 @@ function WorkReportDocument({ workLog, businessName }: Props) {
         {/* Letterhead */}
         <View style={s.letterhead}>
           <View style={s.lhLeft}>
-            <Text style={s.lhCompany}>{businessName || "FieldService"}</Text>
-            <Text style={s.lhTagline}>Field Service Management</Text>
+            <Text style={s.lhCompany}>{businessName}</Text>
+            {business?.address && (
+              <Text style={s.lhTagline}>{business.address}</Text>
+            )}
+            {(business?.city || business?.state || business?.zipCode) && (
+              <Text style={s.lhTagline}>
+                {[business.city, business.state].filter(Boolean).join(', ')}{business.zipCode ? ` ${business.zipCode}` : ''}
+              </Text>
+            )}
+            {business?.phone && (
+              <Text style={s.lhTagline}>{business.phone}</Text>
+            )}
           </View>
           <View style={s.lhRight}>
             <Text style={s.lhFormTitle}>SERVICE COMPLETION FORM</Text>
@@ -354,12 +466,119 @@ function WorkReportDocument({ workLog, businessName }: Props) {
             </View>
           )}
 
-          {/* Section 5: Photo Documentation */}
+          {/* Form Submission Data */}
+          {workLog.form_submissions && workLog.form_submissions.length > 0 && workLog.form_submissions.map((submission, subIdx) => {
+            const template = submission.form_templates;
+            if (!template) return null;
+
+            const fields = template.schema.fields || [];
+            const sections = template.schema.sections || [];
+            const sectionNum = formSectionStart + subIdx;
+
+            // Filter out photo fields (they're shown in photo section)
+            const displayFields = fields.filter(f => f.type !== 'photo' && f.type !== 'signature');
+
+            // Group fields by section
+            const fieldsBySection: Record<string, FormField[]> = {};
+            const unsectionedFields: FormField[] = [];
+
+            displayFields.forEach(field => {
+              if (field.sectionId) {
+                if (!fieldsBySection[field.sectionId]) {
+                  fieldsBySection[field.sectionId] = [];
+                }
+                fieldsBySection[field.sectionId].push(field);
+              } else {
+                unsectionedFields.push(field);
+              }
+            });
+
+            return (
+              <View key={submission.id} style={s.section}>
+                <View style={s.sectionHeader}>
+                  <Text style={s.sectionTitle}>{sectionNum}. {template.name}</Text>
+                </View>
+                <View style={s.formBorder}>
+                  {/* Render sectioned fields */}
+                  {sections.map((section, sIdx) => {
+                    const sectionFields = fieldsBySection[section.id] || [];
+                    if (sectionFields.length === 0) return null;
+
+                    return (
+                      <View key={section.id}>
+                        {/* Section sub-header */}
+                        <View style={[s.formRow, { backgroundColor: C.gray50 }]}>
+                          <View style={s.formCellLast}>
+                            <Text style={[s.fieldLabel, { fontSize: 8, color: C.gray700 }]}>{section.title}</Text>
+                          </View>
+                        </View>
+                        {/* Section fields in pairs */}
+                        {sectionFields.reduce((rows: JSX.Element[], field, i) => {
+                          if (i % 2 === 0) {
+                            const nextField = sectionFields[i + 1];
+                            const isLastRow = i >= sectionFields.length - 2;
+                            rows.push(
+                              <View key={field.id} style={isLastRow && sIdx === sections.length - 1 && unsectionedFields.length === 0 ? s.formRowLast : s.formRow}>
+                                <View style={s.formCell}>
+                                  <Text style={s.fieldLabel}>{field.label}</Text>
+                                  <Text style={s.fieldValue}>{formatFieldValue(submission.responses[field.id], field)}</Text>
+                                </View>
+                                {nextField ? (
+                                  <View style={s.formCellLast}>
+                                    <Text style={s.fieldLabel}>{nextField.label}</Text>
+                                    <Text style={s.fieldValue}>{formatFieldValue(submission.responses[nextField.id], nextField)}</Text>
+                                  </View>
+                                ) : (
+                                  <View style={s.formCellLast} />
+                                )}
+                              </View>
+                            );
+                          }
+                          return rows;
+                        }, [])}
+                      </View>
+                    );
+                  })}
+
+                  {/* Render unsectioned fields */}
+                  {unsectionedFields.length > 0 && (
+                    <>
+                      {unsectionedFields.reduce((rows: JSX.Element[], field, i) => {
+                        if (i % 2 === 0) {
+                          const nextField = unsectionedFields[i + 1];
+                          const isLastRow = i >= unsectionedFields.length - 2;
+                          rows.push(
+                            <View key={field.id} style={isLastRow ? s.formRowLast : s.formRow}>
+                              <View style={s.formCell}>
+                                <Text style={s.fieldLabel}>{field.label}</Text>
+                                <Text style={s.fieldValue}>{formatFieldValue(submission.responses[field.id], field)}</Text>
+                              </View>
+                              {nextField ? (
+                                <View style={s.formCellLast}>
+                                  <Text style={s.fieldLabel}>{nextField.label}</Text>
+                                  <Text style={s.fieldValue}>{formatFieldValue(submission.responses[nextField.id], nextField)}</Text>
+                                </View>
+                              ) : (
+                                <View style={s.formCellLast} />
+                              )}
+                            </View>
+                          );
+                        }
+                        return rows;
+                      }, [])}
+                    </>
+                  )}
+                </View>
+              </View>
+            );
+          })}
+
+          {/* Photo Documentation */}
           {zones.length > 0 && (
             <View style={s.photoSection}>
               <View style={s.sectionHeader}>
                 <Text style={s.sectionTitle}>
-                  {workLog.additional_notes ? "5" : "4"}. Photo Documentation ({photos.length} photo{photos.length !== 1 ? "s" : ""})
+                  {photoSectionNum}. Photo Documentation ({photos.length} photo{photos.length !== 1 ? "s" : ""})
                 </Text>
               </View>
               {zones.map(({ list, label, bg }) => (
@@ -390,7 +609,7 @@ function WorkReportDocument({ workLog, businessName }: Props) {
           <View style={s.section}>
             <View style={s.sectionHeader}>
               <Text style={s.sectionTitle}>
-                {zones.length > 0 ? (workLog.additional_notes ? "6" : "5") : (workLog.additional_notes ? "5" : "4")}. Certification &amp; Authorization
+                {certSectionNum}. Certification &amp; Authorization
               </Text>
             </View>
             <View style={s.sigSection}>
@@ -400,18 +619,42 @@ function WorkReportDocument({ workLog, businessName }: Props) {
               <View style={s.sigRow}>
                 <View style={s.sigCell}>
                   <Text style={s.sigLabel}>Technician Signature</Text>
-                  <View style={s.sigLine} />
+                  {(() => {
+                    // Look for technician signature in form submissions
+                    const techSig = workLog.form_submissions?.flatMap(sub =>
+                      sub.form_templates?.schema.fields
+                        .filter(f => f.type === 'signature' && f.label.toLowerCase().includes('tech'))
+                        .map(f => sub.responses[f.id] as string | undefined)
+                    ).find(sig => sig);
+                    return techSig ? (
+                      <Image src={techSig} style={{ width: '100%', height: 40, objectFit: 'contain' }} />
+                    ) : (
+                      <View style={s.sigLine} />
+                    );
+                  })()}
                   <Text style={s.sigCaption}>Name &amp; Date</Text>
                 </View>
                 <View style={s.sigCell}>
                   <Text style={s.sigLabel}>Customer Signature</Text>
-                  <View style={s.sigLine} />
+                  {(() => {
+                    // Look for customer signature in form submissions
+                    const custSig = workLog.form_submissions?.flatMap(sub =>
+                      sub.form_templates?.schema.fields
+                        .filter(f => f.type === 'signature' && f.label.toLowerCase().includes('customer'))
+                        .map(f => sub.responses[f.id] as string | undefined)
+                    ).find(sig => sig);
+                    return custSig ? (
+                      <Image src={custSig} style={{ width: '100%', height: 40, objectFit: 'contain' }} />
+                    ) : (
+                      <View style={s.sigLine} />
+                    );
+                  })()}
                   <Text style={s.sigCaption}>Name &amp; Date</Text>
                 </View>
                 <View style={s.sigCellLast}>
                   <Text style={s.sigLabel}>Date</Text>
                   <View style={s.sigLine} />
-                  <Text style={s.sigCaption}>MM / DD / YYYY</Text>
+                  <Text style={s.sigCaption}>{workLog.service_date ? fmtDate(workLog.service_date) : 'MM / DD / YYYY'}</Text>
                 </View>
               </View>
             </View>
@@ -429,8 +672,8 @@ function WorkReportDocument({ workLog, businessName }: Props) {
   );
 }
 
-export async function generateWorkReportPDF(workLog: WorkLog, businessName?: string): Promise<Blob> {
-  const doc = <WorkReportDocument workLog={workLog} businessName={businessName} />;
+export async function generateWorkReportPDF(workLog: WorkLog, business?: BusinessInfo): Promise<Blob> {
+  const doc = <WorkReportDocument workLog={workLog} business={business} />;
   const blob = await pdf(doc).toBlob();
   return blob;
 }

@@ -1,12 +1,14 @@
 import { createClient } from './server';
 import { createAdminClient } from './admin';
 
+export type UserRole = 'owner' | 'admin' | 'manager' | 'technician';
+
 export async function getUserAndBusiness() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return { user: null, userProfile: null, business: null, userId: null };
+    return { user: null, userProfile: null, business: null, userId: null, role: null as UserRole | null };
   }
 
   const adminClient = createAdminClient();
@@ -46,12 +48,28 @@ export async function getUserAndBusiness() {
     }
   }
 
-  // Get business for this user
-  const { data: business } = await adminClient
+  // First try: user is business owner
+  let { data: business } = await adminClient
     .from('businesses')
     .select('*')
     .eq('owner_id', userId)
     .single();
 
-  return { user, userProfile, business, userId };
+  let role: UserRole = 'owner';
+
+  // Second try: user is a team member
+  if (!business) {
+    const { data: membership } = await adminClient
+      .from('business_members')
+      .select('*, business:businesses(*)')
+      .eq('user_id', userId)
+      .single();
+
+    if (membership) {
+      business = membership.business;
+      role = membership.role as UserRole; // 'technician', 'manager', 'admin'
+    }
+  }
+
+  return { user, userProfile, business, userId, role };
 }

@@ -4,10 +4,19 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserAndBusiness } from '@/lib/supabase/getUserAndBusiness';
 import { revalidatePath } from 'next/cache';
 
+import type { PhotoFieldConfig, DocumentFieldConfig } from '@/lib/form-types';
+
 export type FormFieldType =
   | 'text' | 'textarea' | 'number' | 'date' | 'time'
   | 'select' | 'multiselect' | 'checkbox' | 'radio'
-  | 'photo' | 'signature' | 'gps';
+  | 'photo' | 'signature' | 'gps' | 'document';
+
+// Conditional display rule - show field only when condition is met
+export type ShowIfCondition = {
+  field: string;           // ID of the field to check
+  operator: 'equals' | 'notEquals' | 'contains' | 'isNotEmpty' | 'isEmpty';
+  value?: string | boolean; // Value to compare (not needed for isEmpty/isNotEmpty)
+};
 
 export type FormField = {
   id: string;
@@ -17,6 +26,9 @@ export type FormField = {
   required?: boolean;
   options?: { label: string; value: string }[];
   sectionId?: string;
+  photoConfig?: PhotoFieldConfig;      // GPS verification settings for photo fields
+  documentConfig?: DocumentFieldConfig; // Settings for document upload fields
+  showIf?: ShowIfCondition;            // Conditional display rule
 };
 
 export type FormSection = {
@@ -181,9 +193,15 @@ const STARTER_TEMPLATE_DATA: Record<string, {
           { label: 'Digital', value: 'digital' },
           { label: 'Smart Meter', value: 'smart' },
         ]},
-        { id: 'photo_roof', type: 'photo', label: 'Roof Photo', sectionId: 'photos' },
-        { id: 'photo_panel', type: 'photo', label: 'Electrical Panel Photo', sectionId: 'photos' },
-        { id: 'photo_meter', type: 'photo', label: 'Meter Photo', sectionId: 'photos' },
+        { id: 'photo_roof', type: 'photo', label: 'Roof Photo', sectionId: 'photos', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'general', minPhotos: 1, maxPhotos: 5
+        }},
+        { id: 'photo_panel', type: 'photo', label: 'Electrical Panel Photo', sectionId: 'photos', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'general', minPhotos: 1, maxPhotos: 3
+        }},
+        { id: 'photo_meter', type: 'photo', label: 'Meter Photo', sectionId: 'photos', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'general', minPhotos: 1, maxPhotos: 2
+        }},
         { id: 'gps', type: 'gps', label: 'Site Location', sectionId: 'site' },
       ],
     },
@@ -210,7 +228,12 @@ const STARTER_TEMPLATE_DATA: Record<string, {
         { id: 'inverter_serial', type: 'text', label: 'Inverter Serial Number', sectionId: 'install' },
         { id: 'system_tested', type: 'checkbox', label: 'System tested and operational', sectionId: 'completion' },
         { id: 'customer_walkthrough', type: 'checkbox', label: 'Customer walkthrough completed', sectionId: 'completion' },
-        { id: 'photo_completed', type: 'photo', label: 'Completed Installation Photo', sectionId: 'completion' },
+        { id: 'photo_before', type: 'photo', label: 'Before Photos', sectionId: 'safety', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'before', minPhotos: 1, maxPhotos: 5
+        }},
+        { id: 'photo_completed', type: 'photo', label: 'Completed Installation Photo', sectionId: 'completion', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'after', minPhotos: 1, maxPhotos: 5
+        }},
         { id: 'notes', type: 'textarea', label: 'Additional Notes', sectionId: 'completion' },
       ],
     },
@@ -222,6 +245,7 @@ const STARTER_TEMPLATE_DATA: Record<string, {
     schema: {
       sections: [
         { id: 'arrival', title: 'Arrival' },
+        { id: 'diagnosis', title: 'Diagnosis' },
         { id: 'work', title: 'Work Performed' },
         { id: 'departure', title: 'Departure' },
       ],
@@ -232,10 +256,31 @@ const STARTER_TEMPLATE_DATA: Record<string, {
           { label: 'Partial Output', value: 'partial' },
           { label: 'Not Working', value: 'down' },
         ]},
+        // CONDITIONAL: Only show error code when system is down
+        { id: 'error_code', type: 'text', label: 'Inverter Error Code', sectionId: 'diagnosis',
+          showIf: { field: 'system_status_arrival', operator: 'equals', value: 'down' }
+        },
+        // CONDITIONAL: Only show inverter photo when system is not operational
+        { id: 'photo_inverter_display', type: 'photo', label: 'Inverter Display Photo (showing error)', sectionId: 'diagnosis',
+          showIf: { field: 'system_status_arrival', operator: 'notEquals', value: 'operational' },
+          photoConfig: { gpsRequired: false, verifyLocation: false, classification: 'general', minPhotos: 1, maxPhotos: 2 }
+        },
         { id: 'issue_reported', type: 'textarea', label: 'Issue Reported by Customer', sectionId: 'arrival' },
+        { id: 'photo_arrival', type: 'photo', label: 'Arrival Photos', sectionId: 'arrival', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'before', minPhotos: 0, maxPhotos: 3
+        }},
         { id: 'work_description', type: 'textarea', label: 'Work Performed', required: true, sectionId: 'work' },
-        { id: 'parts_used', type: 'textarea', label: 'Parts/Materials Used', sectionId: 'work' },
-        { id: 'photo_work', type: 'photo', label: 'Photo of Work', sectionId: 'work' },
+        { id: 'parts_replaced', type: 'checkbox', label: 'Parts were replaced', sectionId: 'work' },
+        // CONDITIONAL: Only show parts list when parts were replaced
+        { id: 'parts_used', type: 'textarea', label: 'Parts/Materials Used', sectionId: 'work',
+          showIf: { field: 'parts_replaced', operator: 'equals', value: true }
+        },
+        { id: 'photo_work', type: 'photo', label: 'Photo of Work', sectionId: 'work', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'general', minPhotos: 1, maxPhotos: 5
+        }},
+        { id: 'photo_completion', type: 'photo', label: 'Completion Photos', sectionId: 'departure', photoConfig: {
+          gpsRequired: false, verifyLocation: true, verificationRadius: 100, classification: 'after', minPhotos: 0, maxPhotos: 3
+        }},
         { id: 'departure_time', type: 'time', label: 'Departure Time', sectionId: 'departure' },
         { id: 'system_status_departure', type: 'select', label: 'System Status on Departure', sectionId: 'departure', options: [
           { label: 'Fully Operational', value: 'operational' },
@@ -243,7 +288,20 @@ const STARTER_TEMPLATE_DATA: Record<string, {
           { label: 'Awaiting Parts', value: 'awaiting' },
         ]},
         { id: 'followup_needed', type: 'checkbox', label: 'Follow-up visit required', sectionId: 'departure' },
-        { id: 'followup_notes', type: 'textarea', label: 'Follow-up Notes', sectionId: 'departure' },
+        // CONDITIONAL: Only show follow-up notes when follow-up is needed
+        { id: 'followup_notes', type: 'textarea', label: 'Follow-up Notes', sectionId: 'departure',
+          showIf: { field: 'followup_needed', operator: 'equals', value: true }
+        },
+        // CONDITIONAL: Only show scheduling preference when follow-up is needed
+        { id: 'followup_urgency', type: 'select', label: 'Follow-up Urgency', sectionId: 'departure',
+          showIf: { field: 'followup_needed', operator: 'equals', value: true },
+          options: [
+            { label: 'Within 24 hours', value: 'urgent' },
+            { label: 'Within 1 week', value: 'soon' },
+            { label: 'When parts arrive', value: 'parts' },
+            { label: 'Next scheduled maintenance', value: 'scheduled' },
+          ]
+        },
       ],
     },
   },
@@ -323,6 +381,48 @@ export async function deleteFormTemplate(id: string) {
 
   if (error) {
     return { error: error.message };
+  }
+
+  revalidatePath('/forms');
+  return { success: true };
+}
+
+export async function cloneFormTemplate(id: string) {
+  const { user, business } = await getUserAndBusiness();
+
+  if (!user || !business) {
+    return { error: 'Not authenticated' };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Get the existing template
+  const { data: existingTemplate, error: fetchError } = await adminClient
+    .from('form_templates')
+    .select('*')
+    .eq('id', id)
+    .eq('business_id', business.id)
+    .single();
+
+  if (fetchError || !existingTemplate) {
+    return { error: 'Template not found' };
+  }
+
+  // Create a copy with "(Copy)" appended to the name
+  const { error: insertError } = await adminClient
+    .from('form_templates')
+    .insert({
+      business_id: business.id,
+      name: `${existingTemplate.name} (Copy)`,
+      description: existingTemplate.description,
+      work_type: existingTemplate.work_type,
+      schema: existingTemplate.schema,
+      logic_rules: existingTemplate.logic_rules || [],
+      is_active: 'true',
+    });
+
+  if (insertError) {
+    return { error: insertError.message };
   }
 
   revalidatePath('/forms');

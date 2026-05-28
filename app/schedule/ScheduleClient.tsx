@@ -5,15 +5,21 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { WorkLogForm } from '@/components/WorkLogForm';
-import { updateWorkLogStatus, deleteWorkLog, updateWorkLog } from './actions';
-import { ImageUpload, type UploadedImage } from '@/components/ImageUpload';
+import { updateWorkLogStatus, deleteWorkLog } from './actions';
 import { generateWorkReportPDF, downloadPDF } from '@/components/WorkReportPDF';
 import { JobMap } from '@/components/JobMap';
+import { JobCalendar } from '@/components/JobCalendar';
+
+type ViewMode = 'list' | 'calendar';
 
 interface PhotoMeta {
   url: string;
   type: 'before' | 'after' | 'general';
+  fieldLabel?: string;
   capturedAt: string;
+  lat?: number;
+  lng?: number;
+  accuracy?: number;
 }
 
 interface FormSubmission {
@@ -27,6 +33,13 @@ interface FormSubmission {
   };
 }
 
+interface AssignedTech {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+}
+
 interface WorkLog {
   id: string;
   customer_name: string;
@@ -38,12 +51,17 @@ interface WorkLog {
   service_date: string;
   start_time: string | null;
   end_time: string | null;
+  scheduled_start_time?: string | null;
+  scheduled_end_time?: string | null;
   status: string;
   work_performed: string;
   additional_notes: string | null;
   image_urls: string[] | null;
   photo_metadata: PhotoMeta[] | null;
   form_submissions?: FormSubmission[];
+  property_id?: string | null;
+  technician_user_id?: string | null;
+  assigned_tech?: AssignedTech | null;
 }
 
 type FormTemplate = {
@@ -63,37 +81,59 @@ type Property = {
   zip_code: string;
 };
 
+type BusinessInfo = {
+  name: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  phone?: string;
+  logoUrl?: string;
+};
+
+type TeamMember = {
+  id: string;
+  userId: string;
+  role: string;
+  user: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+  } | null;
+};
+
 interface ScheduleClientProps {
   scheduledJobs: WorkLog[] | null;
   formTemplates: FormTemplate[];
   properties?: Property[];
+  teamMembers?: TeamMember[];
+  business?: BusinessInfo;
+  initialSelectedJobId?: string | null;
+  openNewForm?: boolean;
 }
 
-const WORK_TYPES = [
-  'Solar Installation',
-  'Solar Maintenance',
-  'Solar Repair',
-  'Inspection',
-  'Maintenance',
-  'Repair',
-  'Installation',
-  'Consultation',
-  'Other',
-];
-
-export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }: ScheduleClientProps) {
-  const [showForm, setShowForm] = useState(false);
-  const [selectedJob, setSelectedJob] = useState<WorkLog | null>(null);
+export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], teamMembers = [], business, initialSelectedJobId, openNewForm }: ScheduleClientProps) {
+  const [showForm, setShowForm] = useState(openNewForm || false);
+  const [selectedJob, setSelectedJob] = useState<WorkLog | null>(() => {
+    // Auto-select job from URL parameter
+    if (initialSelectedJobId && scheduledJobs) {
+      return scheduledJobs.find(j => j.id === initialSelectedJobId) || null;
+    }
+    return null;
+  });
   const [isEditing, setIsEditing] = useState(false);
   const [updating, setUpdating] = useState<string | null>(null);
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
-  const [editError, setEditError] = useState('');
   const [generatingPDF, setGeneratingPDF] = useState(false);
-
-  // Edit form state
-  const [editImages, setEditImages] = useState<UploadedImage[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('list');
 
   const router = useRouter();
+
+  // Handle job click from calendar
+  const handleJobClick = (job: WorkLog) => {
+    setSelectedJob(job);
+  };
 
   const handleStatusChange = async (id: string, status: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -114,52 +154,18 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
   };
 
   const startEditing = () => {
-    if (selectedJob) {
-      // Initialize edit images from current photos
-      const currentImages: UploadedImage[] = (selectedJob.photo_metadata || []).map(p => ({
-        url: p.url,
-        type: p.type,
-        capturedAt: p.capturedAt,
-      }));
-      setEditImages(currentImages);
-      setIsEditing(true);
-      setEditError('');
-    }
+    setIsEditing(true);
   };
 
   const cancelEditing = () => {
     setIsEditing(false);
-    setEditError('');
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!selectedJob) return;
-
-    setUpdating(selectedJob.id);
-    setEditError('');
-
-    const formData = new FormData(e.currentTarget);
-    formData.set('images', JSON.stringify(editImages));
-
-    const result = await updateWorkLog(selectedJob.id, formData);
-
-    if (result?.error) {
-      setEditError(result.error);
-      setUpdating(null);
-    } else {
-      setIsEditing(false);
-      setSelectedJob(null);
-      router.refresh();
-      setUpdating(null);
-    }
   };
 
   const handleExportPDF = async () => {
     if (!selectedJob) return;
     setGeneratingPDF(true);
     try {
-      const blob = await generateWorkReportPDF(selectedJob, 'FieldService');
+      const blob = await generateWorkReportPDF(selectedJob, business);
       const filename = `WorkOrder-${selectedJob.customer_name.replace(/\s+/g, '_')}-${selectedJob.service_date}.pdf`;
       downloadPDF(blob, filename);
     } catch (error) {
@@ -170,6 +176,17 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
     }
   };
 
+  // Group photos by fieldLabel (or fallback to type-based labels for legacy photos)
+  const photosByLabel = (selectedJob?.photo_metadata || []).reduce((acc, photo) => {
+    const label = photo.fieldLabel || (photo.type === 'before' ? 'Before' : photo.type === 'after' ? 'After' : 'Other Photos');
+    if (!acc[label]) {
+      acc[label] = { photos: [], type: photo.type };
+    }
+    acc[label].photos.push(photo);
+    return acc;
+  }, {} as Record<string, { photos: PhotoMeta[]; type: string }>);
+
+  // Legacy grouping for backwards compatibility display
   const beforePhotos = selectedJob?.photo_metadata?.filter(p => p.type === 'before') || [];
   const afterPhotos = selectedJob?.photo_metadata?.filter(p => p.type === 'after') || [];
   const generalPhotos = selectedJob?.photo_metadata?.filter(p => p.type === 'general') || [];
@@ -183,10 +200,37 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
             View and manage jobs
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setShowForm(true)}>
-          <i className="fas fa-plus"></i>
-          New Job
-        </Button>
+        <div className="flex items-center gap-3">
+          {/* View Toggle */}
+          <div className="flex rounded-lg border border-input overflow-hidden">
+            <button
+              onClick={() => setViewMode('list')}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                viewMode === 'list'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              <i className="fas fa-list mr-2"></i>
+              List
+            </button>
+            <button
+              onClick={() => setViewMode('calendar')}
+              className={`px-3 py-2 text-sm font-medium transition-colors ${
+                viewMode === 'calendar'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-background text-muted-foreground hover:text-foreground hover:bg-muted'
+              }`}
+            >
+              <i className="fas fa-calendar-alt mr-2"></i>
+              Calendar
+            </button>
+          </div>
+          <Button className="gap-2" onClick={() => setShowForm(true)}>
+            <i className="fas fa-plus"></i>
+            New Job
+          </Button>
+        </div>
       </div>
 
       {/* Create Form Modal */}
@@ -200,6 +244,9 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
                 onSuccess={() => router.refresh()}
                 formTemplates={formTemplates}
                 properties={properties}
+                teamMembers={teamMembers}
+                defaultCity={business?.city || ''}
+                defaultState={business?.state || ''}
               />
             </CardContent>
           </Card>
@@ -212,152 +259,27 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
           <Card className="w-full max-w-2xl my-8" onClick={e => e.stopPropagation()}>
             <CardContent className="p-6 max-h-[85vh] overflow-y-auto">
               {isEditing ? (
-                /* Edit Mode */
-                <form onSubmit={handleEditSubmit}>
-                  <div className="flex items-center justify-between mb-6">
+                /* Edit Mode - use full WorkLogForm */
+                <>
+                  <div className="flex items-center justify-between mb-4">
                     <h3 className="text-xl font-semibold">Edit Job</h3>
                     <button type="button" onClick={() => { setSelectedJob(null); setIsEditing(false); }} className="text-muted-foreground hover:text-foreground p-2">
                       <i className="fas fa-times text-lg"></i>
                     </button>
                   </div>
-
-                  {editError && (
-                    <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm mb-4">
-                      {editError}
-                    </div>
-                  )}
-
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Customer Name *</label>
-                        <input
-                          name="customerName"
-                          defaultValue={selectedJob.customer_name}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Work Type *</label>
-                        <select
-                          name="workType"
-                          defaultValue={selectedJob.work_type}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          {WORK_TYPES.map(type => (
-                            <option key={type} value={type}>{type}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Location Name *</label>
-                      <input
-                        name="locationName"
-                        defaultValue={selectedJob.location_name}
-                        required
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">City *</label>
-                        <input
-                          name="city"
-                          defaultValue={selectedJob.city}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">State *</label>
-                        <input
-                          name="state"
-                          defaultValue={selectedJob.state}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">ZIP *</label>
-                        <input
-                          name="zipCode"
-                          defaultValue={selectedJob.zip_code}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Service Date *</label>
-                        <input
-                          name="serviceDate"
-                          type="date"
-                          defaultValue={selectedJob.service_date}
-                          required
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Status</label>
-                        <select
-                          name="status"
-                          defaultValue={selectedJob.status}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                        >
-                          <option value="scheduled">Scheduled</option>
-                          <option value="in-progress">In Progress</option>
-                          <option value="completed">Completed</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Work Performed *</label>
-                      <textarea
-                        name="workPerformed"
-                        defaultValue={selectedJob.work_performed}
-                        required
-                        rows={3}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Additional Notes</label>
-                      <textarea
-                        name="notes"
-                        defaultValue={selectedJob.additional_notes || ''}
-                        rows={2}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      />
-                    </div>
-
-                    {/* Photo Management */}
-                    <div className="border-t pt-4">
-                      <label className="block text-sm font-medium mb-3">
-                        <i className="fas fa-camera text-primary mr-2"></i>
-                        Photos (Before / After)
-                      </label>
-                      <ImageUpload images={editImages} onChange={setEditImages} maxImages={10} />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-3 pt-6 border-t mt-6">
-                    <Button type="button" variant="outline" onClick={cancelEditing} className="flex-1">
-                      Cancel
-                    </Button>
-                    <Button type="submit" disabled={updating === selectedJob.id} className="flex-1">
-                      {updating === selectedJob.id ? 'Saving...' : 'Save Changes'}
-                    </Button>
-                  </div>
-                </form>
+                  <WorkLogForm
+                    onClose={cancelEditing}
+                    onSuccess={() => {
+                      setIsEditing(false);
+                      setSelectedJob(null);
+                      router.refresh();
+                    }}
+                    formTemplates={formTemplates}
+                    properties={properties}
+                    teamMembers={teamMembers}
+                    editJob={selectedJob}
+                  />
+                </>
               ) : (
                 /* View Mode */
                 <>
@@ -444,69 +366,38 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
                   )}
 
                   {/* Photos Section */}
-                  {(beforePhotos.length > 0 || afterPhotos.length > 0 || generalPhotos.length > 0) && (
+                  {Object.keys(photosByLabel).length > 0 && (
                     <div className="mb-6">
                       <h4 className="font-medium mb-3">Photos</h4>
 
-                      {beforePhotos.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-orange-600 mb-2 flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-                            Before ({beforePhotos.length})
-                          </p>
-                          <div className="grid grid-cols-4 gap-2">
-                            {beforePhotos.map((photo, i) => (
-                              <img
-                                key={i}
-                                src={photo.url}
-                                alt="Before"
-                                onClick={() => setLightboxImage(photo.url)}
-                                className="w-full aspect-square object-cover rounded-lg border-2 border-orange-400 cursor-pointer hover:opacity-80 transition-opacity"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                      {Object.entries(photosByLabel).map(([label, { photos, type }]) => {
+                        // Color coding based on photo type
+                        const colorClass = type === 'before'
+                          ? { text: 'text-orange-600', bg: 'bg-orange-500', border: 'border-orange-400' }
+                          : type === 'after'
+                          ? { text: 'text-green-600', bg: 'bg-green-500', border: 'border-green-400' }
+                          : { text: 'text-blue-600', bg: 'bg-blue-500', border: 'border-blue-400' };
 
-                      {afterPhotos.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-green-600 mb-2 flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                            After ({afterPhotos.length})
-                          </p>
-                          <div className="grid grid-cols-4 gap-2">
-                            {afterPhotos.map((photo, i) => (
-                              <img
-                                key={i}
-                                src={photo.url}
-                                alt="After"
-                                onClick={() => setLightboxImage(photo.url)}
-                                className="w-full aspect-square object-cover rounded-lg border-2 border-green-400 cursor-pointer hover:opacity-80 transition-opacity"
-                              />
-                            ))}
+                        return (
+                          <div key={label} className="mb-4">
+                            <p className={`text-sm font-medium ${colorClass.text} mb-2 flex items-center gap-2`}>
+                              <span className={`w-3 h-3 rounded-full ${colorClass.bg}`}></span>
+                              {label} ({photos.length})
+                            </p>
+                            <div className="grid grid-cols-4 gap-2">
+                              {photos.map((photo, i) => (
+                                <img
+                                  key={i}
+                                  src={photo.url}
+                                  alt={label}
+                                  onClick={() => setLightboxImage(photo.url)}
+                                  className={`w-full aspect-square object-cover rounded-lg border-2 ${colorClass.border} cursor-pointer hover:opacity-80 transition-opacity`}
+                                />
+                              ))}
+                            </div>
                           </div>
-                        </div>
-                      )}
-
-                      {generalPhotos.length > 0 && (
-                        <div className="mb-4">
-                          <p className="text-sm font-medium text-blue-600 mb-2 flex items-center gap-2">
-                            <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                            Other Photos ({generalPhotos.length})
-                          </p>
-                          <div className="grid grid-cols-4 gap-2">
-                            {generalPhotos.map((photo, i) => (
-                              <img
-                                key={i}
-                                src={photo.url}
-                                alt="Photo"
-                                onClick={() => setLightboxImage(photo.url)}
-                                className="w-full aspect-square object-cover rounded-lg border-2 border-blue-400 cursor-pointer hover:opacity-80 transition-opacity"
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -514,25 +405,67 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
                   {selectedJob.form_submissions && selectedJob.form_submissions.length > 0 && (
                     <div className="mb-6">
                       <h4 className="font-medium mb-3">Form Data</h4>
-                      {selectedJob.form_submissions.map((submission) => (
-                        <div key={submission.id} className="bg-muted/30 rounded-lg p-4">
-                          <p className="font-medium text-sm mb-3">
-                            {submission.form_templates?.name || 'Form Submission'}
-                          </p>
-                          <div className="space-y-2">
-                            {submission.form_templates?.schema?.fields?.map((field) => {
-                              const value = submission.responses[field.id];
-                              if (value === undefined || value === null || value === '') return null;
-                              return (
-                                <div key={field.id} className="flex justify-between text-sm">
-                                  <span className="text-muted-foreground">{field.label}:</span>
-                                  <span className="font-medium">{String(value)}</span>
+                      {selectedJob.form_submissions.map((submission) => {
+                        const signatureFields = submission.form_templates?.schema?.fields?.filter(f => f.type === 'signature') || [];
+                        const otherFields = submission.form_templates?.schema?.fields?.filter(f => f.type !== 'signature' && f.type !== 'photo') || [];
+
+                        return (
+                          <div key={submission.id} className="bg-muted/30 rounded-lg p-4">
+                            <p className="font-medium text-sm mb-3">
+                              {submission.form_templates?.name || 'Form Submission'}
+                            </p>
+                            <div className="space-y-2">
+                              {otherFields.map((field) => {
+                                const value = submission.responses[field.id];
+                                if (value === undefined || value === null || value === '') return null;
+
+                                // Format checkbox values
+                                const displayValue = field.type === 'checkbox'
+                                  ? (value === true || value === 'true' ? 'Yes' : 'No')
+                                  : String(value);
+
+                                return (
+                                  <div key={field.id} className="flex justify-between text-sm">
+                                    <span className="text-muted-foreground">{field.label}:</span>
+                                    <span className="font-medium">{displayValue}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+
+                            {/* Signatures */}
+                            {signatureFields.length > 0 && (
+                              <div className="mt-4 pt-4 border-t">
+                                <p className="text-sm font-medium mb-3 flex items-center gap-2">
+                                  <i className="fas fa-signature text-primary"></i>
+                                  Signatures
+                                </p>
+                                <div className="grid grid-cols-2 gap-4">
+                                  {signatureFields.map((field) => {
+                                    const value = submission.responses[field.id] as string | undefined;
+                                    return (
+                                      <div key={field.id}>
+                                        <p className="text-xs text-muted-foreground mb-1">{field.label}</p>
+                                        {value ? (
+                                          <img
+                                            src={value}
+                                            alt={field.label}
+                                            className="w-full h-20 object-contain border rounded bg-white"
+                                          />
+                                        ) : (
+                                          <div className="w-full h-20 border rounded bg-muted/50 flex items-center justify-center text-xs text-muted-foreground">
+                                            Not signed
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
 
@@ -605,7 +538,22 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
             </Button>
           </CardContent>
         </Card>
+      ) : viewMode === 'calendar' ? (
+        /* Calendar View */
+        <Card>
+          <CardContent className="p-4">
+            <JobCalendar
+              jobs={scheduledJobs}
+              onJobClick={handleJobClick}
+              onDateClick={(date) => {
+                // Could pre-fill the date when creating a new job
+                setShowForm(true);
+              }}
+            />
+          </CardContent>
+        </Card>
       ) : (
+        /* List View */
         <div className="space-y-3">
           {scheduledJobs.map((job) => (
             <Card
@@ -626,10 +574,19 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [] }
                       </p>
                       <p className="text-xs text-muted-foreground mt-1">
                         {job.city}, {job.state} - {job.service_date}
+                        {job.assigned_tech && (
+                          <>
+                            <span className="mx-2">|</span>
+                            <i className="fas fa-user mr-1"></i>
+                            {job.assigned_tech.first_name || job.assigned_tech.email?.split('@')[0]} {job.assigned_tech.last_name || ''}
+                          </>
+                        )}
                       </p>
-                      <p className="text-sm text-foreground mt-2 line-clamp-2">
-                        {job.work_performed}
-                      </p>
+                      {job.work_performed && (
+                        <p className="text-sm text-foreground mt-2 line-clamp-2">
+                          {job.work_performed}
+                        </p>
+                      )}
                       {/* Photos thumbnail */}
                       {job.photo_metadata && job.photo_metadata.length > 0 && (
                         <div className="mt-3 flex gap-4">

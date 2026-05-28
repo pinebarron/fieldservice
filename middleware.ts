@@ -1,6 +1,21 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+// Admin-only routes that technicians cannot access
+const ADMIN_ROUTES = [
+  '/settings',
+  '/team',
+  '/vendors',
+  '/pricing',
+  '/forms',
+];
+
+// Routes that technicians CAN access (subset of protected routes)
+const TECH_ALLOWED_ROUTES = [
+  '/tech',
+  '/schedule', // They'll be redirected from schedule to /tech if technician
+];
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -51,6 +66,7 @@ export async function middleware(request: NextRequest) {
     '/pricing',
     '/forms',
     '/onboarding',
+    '/tech',
   ];
   const isProtectedRoute = protectedRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
@@ -63,9 +79,9 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // Redirect authenticated users away from auth pages to dashboard
+  // Redirect authenticated users away from auth pages
   if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/signup' || request.nextUrl.pathname === '/')) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+    return NextResponse.redirect(new URL('/schedule', request.url));
   }
 
   return supabaseResponse;
@@ -73,6 +89,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|api/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|api/|auth/accept-invite|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

@@ -39,7 +39,7 @@ export async function signUp(formData: FormData) {
     return { success: true, message: 'Check your email for confirmation link' };
   }
 
-  redirect('/dashboard');
+  redirect('/schedule');
 }
 
 export async function signIn(formData: FormData) {
@@ -61,7 +61,7 @@ export async function signIn(formData: FormData) {
     return { error: error.message };
   }
 
-  redirect('/dashboard');
+  redirect('/schedule');
 }
 
 export async function signOut() {

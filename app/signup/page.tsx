@@ -3,6 +3,7 @@
 import { signUp } from '@/app/auth/actions';
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
@@ -23,7 +24,11 @@ export default function SignupPage() {
         setSuccess(result.message);
         setLoading(false);
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      // Next.js redirect() throws an error - let it propagate
+      if (err && typeof err === 'object' && 'digest' in err) {
+        throw err;
+      }
       setError('Something went wrong. Please try again.');
       setLoading(false);
     }
@@ -31,17 +36,30 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Field Capture
-          </h1>
-          <p className="text-xl text-muted-foreground mb-4">
-            Professional work log management for solar and industrial field service teams
-          </p>
+      {/* Hero Section with Image */}
+      <div className="relative w-full h-[250px] md:h-[300px] overflow-hidden">
+        <Image
+          src="/solar_home.png"
+          alt="Solar field service"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center px-4">
+            <h1 className="text-3xl md:text-5xl font-bold mb-2 text-white drop-shadow-lg">
+              Field Capture
+            </h1>
+            <p className="text-base md:text-lg text-white/90 max-w-xl mx-auto drop-shadow">
+              Professional work log management for solar and industrial field service teams
+            </p>
+          </div>
         </div>
+      </div>
 
-        <div className="max-w-md mx-auto">
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-md mx-auto -mt-12 relative z-10">
           <div className="bg-card rounded-lg border shadow-sm p-6">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-semibold">Create Account</h2>

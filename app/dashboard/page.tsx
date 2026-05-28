@@ -9,7 +9,7 @@ import type { Stats } from '@/lib/types';
 import { DashboardMap } from './DashboardMap';
 
 export default async function DashboardPage() {
-  const { user, userProfile, business, userId } = await getUserAndBusiness();
+  const { user, userProfile, business, userId, role } = await getUserAndBusiness();
 
   if (!user) {
     redirect('/login');
@@ -17,6 +17,11 @@ export default async function DashboardPage() {
 
   if (!business) {
     redirect('/onboarding');
+  }
+
+  // Redirect technicians to the tech dashboard
+  if (role === 'technician') {
+    redirect('/tech');
   }
 
   const adminClient = createAdminClient();
@@ -100,10 +105,10 @@ export default async function DashboardPage() {
               <i className="fas fa-download"></i>
               <span className="hidden sm:inline">Export</span>
             </Button>
-            <Link href="/schedule">
+            <Link href="/schedule?new=true">
               <Button size="sm" className="gap-2">
                 <i className="fas fa-plus"></i>
-                <span className="hidden sm:inline">New Entry</span>
+                <span className="hidden sm:inline">New Job</span>
               </Button>
             </Link>
           </div>
@@ -190,19 +195,20 @@ export default async function DashboardPage() {
                 <p className="text-muted-foreground mb-4">
                   Start by creating your first work log entry.
                 </p>
-                <Link href="/schedule">
+                <Link href="/schedule?new=true">
                   <Button>
                     <i className="fas fa-plus mr-2"></i>
-                    Create First Entry
+                    Create First Job
                   </Button>
                 </Link>
               </div>
             ) : (
               <div className="space-y-3">
                 {workLogs.map((log) => (
-                  <div
+                  <Link
                     key={log.id}
-                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                    href={`/schedule?job=${log.id}`}
+                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-muted/50 hover:border-primary/50 transition-colors cursor-pointer block"
                   >
                     <div className="flex items-start gap-3">
                       <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
@@ -227,7 +233,7 @@ export default async function DashboardPage() {
                     }`}>
                       {log.status}
                     </span>
-                  </div>
+                  </Link>
                 ))}
               </div>
             )}

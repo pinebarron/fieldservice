@@ -48,6 +48,52 @@ export async function createProperty(formData: FormData) {
   return { success: true };
 }
 
+export async function updateProperty(id: string, formData: FormData) {
+  const { user, business } = await getUserAndBusiness();
+
+  if (!user || !business) {
+    return { error: 'Not authenticated' };
+  }
+
+  const propertyName = formData.get('propertyName') as string;
+  const customerName = formData.get('customerName') as string;
+  const locationName = formData.get('locationName') as string;
+  const city = formData.get('city') as string;
+  const state = formData.get('state') as string;
+  const zipCode = formData.get('zipCode') as string;
+  const notes = formData.get('notes') as string;
+  const status = formData.get('status') as string || 'active';
+
+  if (!propertyName || !customerName || !locationName || !city || !state || !zipCode) {
+    return { error: 'All required fields must be filled' };
+  }
+
+  const adminClient = createAdminClient();
+
+  const { error } = await adminClient
+    .from('properties')
+    .update({
+      property_name: propertyName,
+      customer_name: customerName,
+      location_name: locationName,
+      city,
+      state,
+      zip_code: zipCode,
+      notes: notes || null,
+      status,
+    })
+    .eq('id', id)
+    .eq('business_id', business.id);
+
+  if (error) {
+    console.error('Error updating property:', error);
+    return { error: error.message };
+  }
+
+  revalidatePath('/properties');
+  return { success: true };
+}
+
 export async function deleteProperty(id: string) {
   const { user, business } = await getUserAndBusiness();
 

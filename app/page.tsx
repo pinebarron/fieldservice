@@ -1,31 +1,46 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-16">
-        <div className="max-w-4xl mx-auto text-center mb-12">
-          <h1 className="text-5xl font-bold mb-6 bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-            Field Capture
-          </h1>
-          <p className="text-xl text-muted-foreground mb-8">
-            Professional work log management for solar and industrial field service teams
-          </p>
-          <div className="flex gap-4 justify-center">
-            <Link
-              href="/login"
-              className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90"
-            >
-              Sign In
-            </Link>
-            <Link
-              href="/signup"
-              className="rounded-md border border-primary px-6 py-3 font-medium text-primary hover:bg-primary/10"
-            >
-              Create Account
-            </Link>
+      {/* Hero Section with Image */}
+      <div className="relative w-full h-[400px] md:h-[500px] overflow-hidden">
+        <Image
+          src="/solar_home.png"
+          alt="Solar field service"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="text-center px-4">
+            <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white drop-shadow-lg">
+              Field Capture
+            </h1>
+            <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto drop-shadow">
+              Professional work log management for solar and industrial field service teams
+            </p>
+            <div className="flex gap-4 justify-center">
+              <Link
+                href="/login"
+                className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 shadow-lg"
+              >
+                Sign In
+              </Link>
+              <Link
+                href="/signup"
+                className="rounded-md bg-white/90 backdrop-blur px-6 py-3 font-medium text-gray-900 hover:bg-white shadow-lg"
+              >
+                Create Account
+              </Link>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-16">
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto mt-16">
           <div className="bg-card rounded-lg border p-6">

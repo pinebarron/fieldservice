@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { createFormTemplate, updateFormTemplate, deleteFormTemplate, createStarterTemplate, type FormField, type FormFieldType, type FormSection } from './actions';
+import { createFormTemplate, updateFormTemplate, deleteFormTemplate, cloneFormTemplate, createStarterTemplate, type FormField, type FormFieldType, type FormSection, type ShowIfCondition } from './actions';
+import type { PhotoFieldConfig, DocumentFieldConfig } from '@/lib/form-types';
 
 interface FormTemplate {
   id: string;
@@ -29,6 +30,7 @@ const FIELD_TYPES: { type: FormFieldType; label: string; icon: string }[] = [
   { type: 'checkbox', label: 'Checkbox', icon: 'fa-check-square' },
   { type: 'radio', label: 'Radio', icon: 'fa-dot-circle' },
   { type: 'photo', label: 'Photo', icon: 'fa-camera' },
+  { type: 'document', label: 'Document', icon: 'fa-file-upload' },
   { type: 'signature', label: 'Signature', icon: 'fa-signature' },
   { type: 'gps', label: 'GPS Location', icon: 'fa-map-marker-alt' },
 ];
@@ -75,6 +77,7 @@ export function FormsClient({ formTemplates }: FormsClientProps) {
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [cloning, setCloning] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [formName, setFormName] = useState('');
   const [formDescription, setFormDescription] = useState('');
@@ -174,6 +177,17 @@ export function FormsClient({ formTemplates }: FormsClientProps) {
     await deleteFormTemplate(id);
     router.refresh();
     setDeleting(null);
+  };
+
+  const handleClone = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCloning(id);
+    const result = await cloneFormTemplate(id);
+    if (result?.error) {
+      setError(result.error);
+    }
+    router.refresh();
+    setCloning(null);
   };
 
   const handleUseTemplate = async (templateId: string) => {
@@ -286,20 +300,399 @@ export function FormsClient({ formTemplates }: FormsClientProps) {
       {/* Options for select/radio */}
       {editingField === field.id && (field.type === 'select' || field.type === 'radio') && (
         <div className="mt-3 pl-11">
-          <label className="block text-xs font-medium mb-1">Options (one per line)</label>
-          <textarea
-            value={field.options?.map(o => o.label).join('\n') || ''}
-            onChange={(e) => {
-              const options = e.target.value.split('\n').filter(Boolean).map(label => ({
-                label,
-                value: label.toLowerCase().replace(/\s+/g, '_')
-              }));
-              updateField(field.id, { options });
+          <label className="block text-xs font-medium mb-2">Options</label>
+          <div className="space-y-2">
+            {(field.options || []).map((option, optIndex) => (
+              <div key={optIndex} className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground w-4">{optIndex + 1}.</span>
+                <input
+                  type="text"
+                  value={option.label}
+                  onChange={(e) => {
+                    const newOptions = [...(field.options || [])];
+                    newOptions[optIndex] = {
+                      label: e.target.value,
+                      value: e.target.value.toLowerCase().replace(/\s+/g, '_')
+                    };
+                    updateField(field.id, { options: newOptions });
+                  }}
+                  className="flex-1 rounded border border-input bg-background px-2 py-1 text-sm"
+                  placeholder={`Option ${optIndex + 1}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newOptions = (field.options || []).filter((_, i) => i !== optIndex);
+                    updateField(field.id, { options: newOptions.length > 0 ? newOptions : [{ label: 'Option 1', value: 'option_1' }] });
+                  }}
+                  className="text-muted-foreground hover:text-destructive p-1"
+                  disabled={(field.options || []).length <= 1}
+                >
+                  <i className="fas fa-times text-xs"></i>
+                </button>
+              </div>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const newOptions = [...(field.options || []), { label: '', value: '' }];
+              updateField(field.id, { options: newOptions });
             }}
-            rows={3}
-            className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
-            placeholder="Option 1&#10;Option 2&#10;Option 3"
-          />
+            className="mt-2 text-sm text-primary hover:underline"
+          >
+            <i className="fas fa-plus mr-1"></i>Add Option
+          </button>
+        </div>
+      )}
+
+      {/* Photo field configuration */}
+      {editingField === field.id && field.type === 'photo' && (
+        <div className="mt-3 pl-11 space-y-3 p-3 bg-muted/50 rounded-lg">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Photo Settings</p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={field.photoConfig?.gpsRequired ?? false}
+                onChange={(e) => updateField(field.id, {
+                  photoConfig: { ...field.photoConfig, gpsRequired: e.target.checked }
+                })}
+                className="rounded"
+              />
+              Require GPS location
+            </label>
+
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={field.photoConfig?.verifyLocation ?? false}
+                onChange={(e) => updateField(field.id, {
+                  photoConfig: { ...field.photoConfig, verifyLocation: e.target.checked }
+                })}
+                className="rounded"
+              />
+              Verify against job site
+            </label>
+          </div>
+
+          {field.photoConfig?.verifyLocation && (
+            <div>
+              <label className="block text-xs font-medium mb-1">
+                Verification Radius: {field.photoConfig?.verificationRadius ?? 100}m
+              </label>
+              <input
+                type="range"
+                min={25}
+                max={500}
+                step={25}
+                value={field.photoConfig?.verificationRadius ?? 100}
+                onChange={(e) => updateField(field.id, {
+                  photoConfig: { ...field.photoConfig, verificationRadius: Number(e.target.value) }
+                })}
+                className="w-full"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>25m</span>
+                <span>500m</span>
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-medium mb-1">Classification</label>
+            <select
+              value={field.photoConfig?.classification ?? 'general'}
+              onChange={(e) => updateField(field.id, {
+                photoConfig: { ...field.photoConfig, classification: e.target.value as 'before' | 'after' | 'general' }
+              })}
+              className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+            >
+              <option value="before">Before (pre-work)</option>
+              <option value="after">After (post-work)</option>
+              <option value="general">General</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Min Photos</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={field.photoConfig?.minPhotos ?? 0}
+                onChange={(e) => updateField(field.id, {
+                  photoConfig: { ...field.photoConfig, minPhotos: Number(e.target.value) }
+                })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Max Photos</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={field.photoConfig?.maxPhotos ?? 5}
+                onChange={(e) => updateField(field.id, {
+                  photoConfig: { ...field.photoConfig, maxPhotos: Number(e.target.value) }
+                })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Document field configuration */}
+      {editingField === field.id && field.type === 'document' && (
+        <div className="mt-3 pl-11 space-y-3 p-3 bg-muted/50 rounded-lg">
+          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Document Settings</p>
+
+          <div>
+            <label className="block text-xs font-medium mb-2">Allowed File Types</label>
+            <div className="flex flex-wrap gap-2">
+              {(['pdf', 'doc', 'docx', 'xls', 'xlsx', 'image', 'any'] as const).map(fileType => {
+                const isSelected = field.documentConfig?.allowedTypes?.includes(fileType) ?? (fileType === 'any');
+                const labels: Record<string, string> = {
+                  pdf: 'PDF',
+                  doc: 'Word (.doc)',
+                  docx: 'Word (.docx)',
+                  xls: 'Excel (.xls)',
+                  xlsx: 'Excel (.xlsx)',
+                  image: 'Images',
+                  any: 'Any File',
+                };
+                return (
+                  <label key={fileType} className="flex items-center gap-1.5 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={(e) => {
+                        let newTypes = [...(field.documentConfig?.allowedTypes || ['any'])];
+                        if (fileType === 'any') {
+                          newTypes = e.target.checked ? ['any'] : ['pdf'];
+                        } else {
+                          newTypes = newTypes.filter(t => t !== 'any');
+                          if (e.target.checked) {
+                            newTypes.push(fileType);
+                          } else {
+                            newTypes = newTypes.filter(t => t !== fileType);
+                          }
+                          if (newTypes.length === 0) newTypes = ['any'];
+                        }
+                        updateField(field.id, {
+                          documentConfig: { ...field.documentConfig, allowedTypes: newTypes }
+                        });
+                      }}
+                      className="rounded"
+                    />
+                    {labels[fileType]}
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-xs font-medium mb-1">Max File Size (MB)</label>
+              <input
+                type="number"
+                min={1}
+                max={50}
+                value={field.documentConfig?.maxFileSize ?? 10}
+                onChange={(e) => updateField(field.id, {
+                  documentConfig: { ...field.documentConfig, maxFileSize: Number(e.target.value) }
+                })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Min Files</label>
+              <input
+                type="number"
+                min={0}
+                max={10}
+                value={field.documentConfig?.minFiles ?? 0}
+                onChange={(e) => updateField(field.id, {
+                  documentConfig: { ...field.documentConfig, minFiles: Number(e.target.value) }
+                })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium mb-1">Max Files</label>
+              <input
+                type="number"
+                min={1}
+                max={20}
+                value={field.documentConfig?.maxFiles ?? 5}
+                onChange={(e) => updateField(field.id, {
+                  documentConfig: { ...field.documentConfig, maxFiles: Number(e.target.value) }
+                })}
+                className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Conditional Logic Configuration - available for all field types when editing */}
+      {editingField === field.id && (
+        <div className="mt-3 pl-11 space-y-3 p-3 bg-blue-50 dark:bg-blue-950/30 rounded-lg border border-blue-200 dark:border-blue-900">
+          <div className="flex items-center gap-2">
+            <i className="fas fa-code-branch text-blue-600 dark:text-blue-400"></i>
+            <p className="text-xs font-medium text-blue-700 dark:text-blue-300 uppercase tracking-wide">Conditional Logic</p>
+          </div>
+
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={!!field.showIf}
+              onChange={(e) => {
+                if (e.target.checked) {
+                  // Enable conditional logic with default values
+                  updateField(field.id, {
+                    showIf: { field: '', operator: 'equals', value: '' }
+                  });
+                } else {
+                  // Disable conditional logic
+                  updateField(field.id, { showIf: undefined });
+                }
+              }}
+              className="rounded"
+            />
+            Only show this field when a condition is met
+          </label>
+
+          {field.showIf && (
+            <div className="space-y-2 pl-6">
+              <div className="text-xs text-muted-foreground mb-2">
+                Show this field when...
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {/* Field selector */}
+                <select
+                  value={field.showIf.field}
+                  onChange={(e) => {
+                    const selectedFieldId = e.target.value;
+                    const targetField = fields.find(f => f.id === selectedFieldId);
+                    // Auto-set appropriate default value based on field type
+                    let defaultValue: string | boolean = '';
+                    if (targetField?.type === 'checkbox') {
+                      defaultValue = true; // Default to "checked" for checkboxes
+                    } else if (targetField?.options && targetField.options.length > 0) {
+                      defaultValue = targetField.options[0].value; // Default to first option
+                    }
+                    updateField(field.id, {
+                      showIf: { ...field.showIf!, field: selectedFieldId, value: defaultValue }
+                    });
+                  }}
+                  className="rounded border border-input bg-background px-2 py-1 text-sm"
+                >
+                  <option value="">Select field...</option>
+                  {fields.filter(f => f.id !== field.id).map(f => (
+                    <option key={f.id} value={f.id}>{f.label}</option>
+                  ))}
+                </select>
+
+                {/* Operator selector */}
+                <select
+                  value={field.showIf.operator}
+                  onChange={(e) => updateField(field.id, {
+                    showIf: { ...field.showIf!, operator: e.target.value as ShowIfCondition['operator'] }
+                  })}
+                  className="rounded border border-input bg-background px-2 py-1 text-sm"
+                >
+                  <option value="equals">equals</option>
+                  <option value="notEquals">does not equal</option>
+                  <option value="isNotEmpty">is filled in</option>
+                  <option value="isEmpty">is empty</option>
+                  <option value="contains">contains</option>
+                </select>
+
+                {/* Value input - only show for operators that need a value */}
+                {field.showIf.operator !== 'isEmpty' && field.showIf.operator !== 'isNotEmpty' && (
+                  (() => {
+                    const targetField = fields.find(f => f.id === field.showIf?.field);
+                    // If target is checkbox, show true/false dropdown
+                    if (targetField?.type === 'checkbox') {
+                      // Normalize the value - if it's not explicitly true/false, treat as true
+                      const checkboxValue = field.showIf.value === true || field.showIf.value === 'true' ? 'true' :
+                                           field.showIf.value === false || field.showIf.value === 'false' ? 'false' : 'true';
+                      // Auto-fix the value if it's not set correctly
+                      if (field.showIf.value !== true && field.showIf.value !== false) {
+                        // Schedule an update to fix the value
+                        setTimeout(() => {
+                          updateField(field.id, {
+                            showIf: { ...field.showIf!, value: true }
+                          });
+                        }, 0);
+                      }
+                      return (
+                        <select
+                          value={checkboxValue}
+                          onChange={(e) => updateField(field.id, {
+                            showIf: { ...field.showIf!, value: e.target.value === 'true' }
+                          })}
+                          className="rounded border border-input bg-background px-2 py-1 text-sm"
+                        >
+                          <option value="true">checked</option>
+                          <option value="false">not checked</option>
+                        </select>
+                      );
+                    }
+                    // If target has options, show dropdown
+                    if (targetField?.options && targetField.options.length > 0) {
+                      return (
+                        <select
+                          value={String(field.showIf.value || '')}
+                          onChange={(e) => updateField(field.id, {
+                            showIf: { ...field.showIf!, value: e.target.value }
+                          })}
+                          className="rounded border border-input bg-background px-2 py-1 text-sm"
+                        >
+                          <option value="">Select value...</option>
+                          {targetField.options.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      );
+                    }
+                    // Otherwise show text input
+                    return (
+                      <input
+                        type="text"
+                        value={String(field.showIf.value || '')}
+                        onChange={(e) => updateField(field.id, {
+                          showIf: { ...field.showIf!, value: e.target.value }
+                        })}
+                        placeholder="value"
+                        className="rounded border border-input bg-background px-2 py-1 text-sm"
+                      />
+                    );
+                  })()
+                )}
+              </div>
+
+              {/* Preview of the condition */}
+              {field.showIf.field && (
+                <div className="text-xs text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50 px-2 py-1 rounded">
+                  <i className="fas fa-eye mr-1"></i>
+                  Preview: "{field.label}" will appear when "{fields.find(f => f.id === field.showIf?.field)?.label || field.showIf.field}"
+                  {field.showIf.operator === 'equals' && ` = "${field.showIf.value}"`}
+                  {field.showIf.operator === 'notEquals' && ` ≠ "${field.showIf.value}"`}
+                  {field.showIf.operator === 'isNotEmpty' && ' is filled in'}
+                  {field.showIf.operator === 'isEmpty' && ' is empty'}
+                  {field.showIf.operator === 'contains' && ` contains "${field.showIf.value}"`}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -386,7 +779,16 @@ export function FormsClient({ formTemplates }: FormsClientProps) {
                 {editingTemplate ? 'Edit Form Template' : 'Create Form Template'}
               </h3>
 
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form
+                onSubmit={handleSubmit}
+                onKeyDown={(e) => {
+                  // Prevent Enter from submitting when in textareas or field editors
+                  if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'TEXTAREA') {
+                    e.stopPropagation();
+                  }
+                }}
+                className="space-y-6"
+              >
                 {error && <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">{error}</div>}
 
                 {/* Form Details */}
@@ -576,13 +978,24 @@ export function FormsClient({ formTemplates }: FormsClientProps) {
                       )}
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); handleDelete(form.id); }}
-                    disabled={deleting === form.id}
-                    className="text-muted-foreground hover:text-destructive"
-                  >
-                    <i className={`fas ${deleting === form.id ? 'fa-spinner fa-spin' : 'fa-trash'} text-xs`}></i>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => handleClone(form.id, e)}
+                      disabled={cloning === form.id}
+                      className="text-muted-foreground hover:text-primary"
+                      title="Clone template"
+                    >
+                      <i className={`fas ${cloning === form.id ? 'fa-spinner fa-spin' : 'fa-copy'} text-xs`}></i>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDelete(form.id); }}
+                      disabled={deleting === form.id}
+                      className="text-muted-foreground hover:text-destructive"
+                      title="Delete template"
+                    >
+                      <i className={`fas ${deleting === form.id ? 'fa-spinner fa-spin' : 'fa-trash'} text-xs`}></i>
+                    </button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
