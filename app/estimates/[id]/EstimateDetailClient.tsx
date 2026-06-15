@@ -100,7 +100,7 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
   const total = subtotal + tax - discount;
 
   const addRow = () => {
-    setItems([...items, { description: '', quantity: '1', unit: 'each', unitPrice: '0' }]);
+    setItems([...items, { description: '', quantity: '1', unit: 'unit', unitPrice: '0' }]);
   };
 
   const updateRow = (idx: number, field: string, value: string) => {
@@ -364,11 +364,21 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Unit</label>
-                      <input
+                      <select
                         value={item.unit}
                         onChange={(e) => updateRow(idx, 'unit', e.target.value)}
                         className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
-                      />
+                      >
+                        <option value="watt">Per Watt</option>
+                        <option value="kW">Per kW</option>
+                        <option value="kWh">Per kWh</option>
+                        <option value="panel">Per Panel</option>
+                        <option value="unit">Per Unit</option>
+                        <option value="linear ft">Per Linear Ft</option>
+                        <option value="hour">Per Hour</option>
+                        <option value="flat">Flat Rate</option>
+                        <option value="each">Each</option>
+                      </select>
                     </div>
                     <div>
                       <label className="text-xs text-muted-foreground">Price</label>

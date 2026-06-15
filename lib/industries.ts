@@ -67,12 +67,36 @@ export const INDUSTRIES: Record<IndustryId, IndustryConfig> = {
       'Consultation',
     ],
     pricingItems: [
+      // System Components
       { name: 'Solar Panel', unit: 'panel', defaultPrice: 250 },
-      { name: 'Inverter Installation', unit: 'unit', defaultPrice: 500 },
-      { name: 'Labor', unit: 'hour', defaultPrice: 75 },
-      { name: 'Panel Cleaning', unit: 'panel', defaultPrice: 15 },
+      { name: 'Microinverter', unit: 'unit', defaultPrice: 180 },
+      { name: 'String Inverter', unit: 'unit', defaultPrice: 1500 },
+      { name: 'Power Optimizer', unit: 'unit', defaultPrice: 120 },
+      { name: 'Battery Storage', unit: 'kWh', defaultPrice: 800 },
+      { name: 'EV Charger', unit: 'unit', defaultPrice: 650 },
+
+      // Installation & Hardware
+      { name: 'Racking/Mounting', unit: 'panel', defaultPrice: 45 },
+      { name: 'Conduit Run', unit: 'linear ft', defaultPrice: 8 },
+      { name: 'Critter Guard', unit: 'linear ft', defaultPrice: 12 },
+      { name: 'Main Panel Upgrade', unit: 'flat', defaultPrice: 2500 },
+      { name: 'Subpanel Installation', unit: 'flat', defaultPrice: 1200 },
+
+      // Labor
+      { name: 'Installation Labor', unit: 'hour', defaultPrice: 75 },
       { name: 'Electrical Work', unit: 'hour', defaultPrice: 95 },
+      { name: 'Roofing/Penetrations', unit: 'hour', defaultPrice: 85 },
+
+      // Services
+      { name: 'Panel Cleaning', unit: 'panel', defaultPrice: 15 },
+      { name: 'System Inspection', unit: 'flat', defaultPrice: 150 },
+      { name: 'Monitoring Setup', unit: 'flat', defaultPrice: 200 },
+      { name: 'System Design', unit: 'flat', defaultPrice: 500 },
       { name: 'Permit Filing', unit: 'flat', defaultPrice: 150 },
+      { name: 'Utility Interconnection', unit: 'flat', defaultPrice: 300 },
+
+      // Per-Watt Pricing (common for full system quotes)
+      { name: 'Full System Install', unit: 'watt', defaultPrice: 2.50 },
     ],
     starterTemplates: [
       {

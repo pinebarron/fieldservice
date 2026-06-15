@@ -30,14 +30,14 @@ export function PricingClient({ pricingItems }: PricingClientProps) {
   // Form state
   const [name, setName] = useState('');
   const [category, setCategory] = useState('General');
-  const [unit, setUnit] = useState('each');
+  const [unit, setUnit] = useState('unit');
   const [unitPrice, setUnitPrice] = useState('');
   const [description, setDescription] = useState('');
 
   const resetForm = () => {
     setName('');
     setCategory('General');
-    setUnit('each');
+    setUnit('unit');
     setUnitPrice('');
     setDescription('');
     setError('');
@@ -150,11 +150,15 @@ export function PricingClient({ pricingItems }: PricingClientProps) {
                       onChange={(e) => setUnit(e.target.value)}
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                     >
+                      <option value="watt">Per Watt</option>
+                      <option value="kW">Per kW</option>
+                      <option value="kWh">Per kWh</option>
+                      <option value="panel">Per Panel</option>
+                      <option value="unit">Per Unit</option>
+                      <option value="linear ft">Per Linear Ft</option>
+                      <option value="hour">Per Hour</option>
+                      <option value="flat">Flat Rate</option>
                       <option value="each">Each</option>
-                      <option value="hour">Hour</option>
-                      <option value="sqft">Sq Ft</option>
-                      <option value="panel">Panel</option>
-                      <option value="job">Per Job</option>
                     </select>
                   </div>
                 </div>

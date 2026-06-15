@@ -40,9 +40,9 @@ const WORK_TYPES = [
   'Solar Maintenance',
   'Solar Repair',
   'Inspection',
-  'Maintenance',
-  'Repair',
-  'Installation',
+  'Site Survey',
+  'Panel Cleaning',
+  'Inverter Service',
   'Consultation',
 ];
 
