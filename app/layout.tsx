@@ -40,7 +40,8 @@ export default function RootLayout({
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
           crossOrigin="anonymous"
         />
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="apple-touch-icon" href="/icons/crewatt-logo-primary.svg" />
+        <link rel="icon" type="image/svg+xml" href="/icons/crewatt-logo-primary.svg" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
       </head>
       <body>

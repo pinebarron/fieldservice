@@ -52,14 +52,17 @@ export function TechHeader({ user, userProfile }: TechHeaderProps) {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/tech">
-            <div className="flex items-center gap-3 cursor-pointer">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <i className="fas fa-hard-hat text-primary-foreground text-xl"></i>
-              </div>
-              <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-foreground">Crewatt</h1>
-                <p className="text-xs text-muted-foreground">Tech Dashboard</p>
-              </div>
+            <div className="flex items-center cursor-pointer">
+              <img
+                src="/icons/crewatt-icon.svg"
+                alt="Crewatt"
+                className="w-10 h-10 sm:hidden"
+              />
+              <img
+                src="/icons/crewatt-logo-primary.svg"
+                alt="Crewatt"
+                className="h-10 hidden sm:block"
+              />
             </div>
           </Link>
 

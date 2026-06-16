@@ -48,11 +48,13 @@ export default function SignupPage() {
         <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/40 to-background" />
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center px-4">
-            <h1 className="text-3xl md:text-5xl font-bold mb-2 text-white drop-shadow-lg">
-              Crewatt
-            </h1>
+            <img
+              src="/icons/crewatt-logo-dark.svg"
+              alt="Crewatt"
+              className="h-12 md:h-16 mx-auto mb-4 drop-shadow-lg"
+            />
             <p className="text-base md:text-lg text-white/90 max-w-xl mx-auto drop-shadow">
-              Professional work log management for solar and industrial field service teams
+              Professional work log management for solar field service teams
             </p>
           </div>
         </div>
