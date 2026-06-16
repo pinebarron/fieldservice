@@ -22,7 +22,7 @@ export async function checkIn(jobId: string, lat: number | null, lng: number | n
     .single();
 
   if (!job) {
-    return { error: 'Job not found' };
+    return { error: 'Work order not found' };
   }
 
   // Check if tech is assigned to this job (or if they're owner/admin)
@@ -30,7 +30,7 @@ export async function checkIn(jobId: string, lat: number | null, lng: number | n
   const isAssigned = job.technician_user_id === userId;
 
   if (!isOwnerOrAdmin && !isAssigned) {
-    return { error: 'You are not assigned to this job' };
+    return { error: 'You are not assigned to this work order' };
   }
 
   const now = new Date().toISOString();
@@ -82,7 +82,7 @@ export async function checkOut(jobId: string, lat: number | null, lng: number | 
     .single();
 
   if (!job) {
-    return { error: 'Job not found' };
+    return { error: 'Work order not found' };
   }
 
   // Check if tech is assigned to this job (or if they're owner/admin)
@@ -90,7 +90,7 @@ export async function checkOut(jobId: string, lat: number | null, lng: number | 
   const isAssigned = job.technician_user_id === userId;
 
   if (!isOwnerOrAdmin && !isAssigned) {
-    return { error: 'You are not assigned to this job' };
+    return { error: 'You are not assigned to this work order' };
   }
 
   const now = new Date().toISOString();
@@ -142,7 +142,7 @@ export async function updateJobNotes(jobId: string, workPerformed: string, notes
     .single();
 
   if (!job) {
-    return { error: 'Job not found' };
+    return { error: 'Work order not found' };
   }
 
   // Check if tech is assigned to this job (or if they're owner/admin)
@@ -150,7 +150,7 @@ export async function updateJobNotes(jobId: string, workPerformed: string, notes
   const isAssigned = job.technician_user_id === userId;
 
   if (!isOwnerOrAdmin && !isAssigned) {
-    return { error: 'You are not assigned to this job' };
+    return { error: 'You are not assigned to this work order' };
   }
 
   const { error } = await adminClient
@@ -196,7 +196,7 @@ export async function saveFormSubmission(
     .single();
 
   if (!job) {
-    return { error: 'Job not found' };
+    return { error: 'Work order not found' };
   }
 
   // Check if tech is assigned to this job (or if they're owner/admin)
@@ -204,7 +204,7 @@ export async function saveFormSubmission(
   const isAssigned = job.technician_user_id === userId;
 
   if (!isOwnerOrAdmin && !isAssigned) {
-    return { error: 'You are not assigned to this job' };
+    return { error: 'You are not assigned to this work order' };
   }
 
   // Get the form template to identify photo fields
@@ -310,7 +310,7 @@ export async function toggleCustomerConfirmation(jobId: string) {
     .single();
 
   if (!job) {
-    return { error: 'Job not found' };
+    return { error: 'Work order not found' };
   }
 
   // Check if tech is assigned to this job (or if they're owner/admin)
@@ -318,7 +318,7 @@ export async function toggleCustomerConfirmation(jobId: string) {
   const isAssigned = job.technician_user_id === userId;
 
   if (!isOwnerOrAdmin && !isAssigned) {
-    return { error: 'You are not authorized to update this job' };
+    return { error: 'You are not authorized to update this work order' };
   }
 
   const isCurrentlyConfirmed = job.customer_confirmed === 'true';
@@ -343,4 +343,80 @@ export async function toggleCustomerConfirmation(jobId: string) {
   revalidatePath(`/tech/job/${jobId}`);
   revalidatePath('/schedule');
   return { success: true, confirmed: newConfirmedValue === 'true' };
+}
+
+export async function sendScorecard(jobId: string) {
+  const { user, business, userId, role } = await getUserAndBusiness();
+
+  if (!user || !business || !userId) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Only owners and admins can send scorecards
+  if (role !== 'owner' && role !== 'admin') {
+    return { error: 'Only admins can send scorecards' };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Verify the work order exists and belongs to this business
+  const { data: job } = await adminClient
+    .from('work_logs')
+    .select('*')
+    .eq('id', jobId)
+    .eq('business_id', business.id)
+    .single();
+
+  if (!job) {
+    return { error: 'Work order not found' };
+  }
+
+  // Check if already has a token
+  if (job.feedback_token) {
+    // Return existing token/URL
+    return {
+      success: true,
+      feedbackUrl: `/feedback/${job.feedback_token}`,
+      alreadySent: true,
+    };
+  }
+
+  // Generate unique token
+  const token = generateFeedbackToken();
+
+  const { error } = await adminClient
+    .from('work_logs')
+    .update({
+      feedback_token: token,
+      feedback_sent_at: new Date().toISOString(),
+    })
+    .eq('id', jobId)
+    .eq('business_id', business.id);
+
+  if (error) {
+    console.error('Send scorecard error:', error);
+    return { error: error.message };
+  }
+
+  revalidatePath('/tech');
+  revalidatePath(`/tech/job/${jobId}`);
+  revalidatePath('/schedule');
+
+  return {
+    success: true,
+    feedbackUrl: `/feedback/${token}`,
+    alreadySent: false,
+  };
+}
+
+// Generate a secure random token for feedback links
+function generateFeedbackToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  const randomValues = new Uint8Array(32);
+  crypto.getRandomValues(randomValues);
+  for (let i = 0; i < 32; i++) {
+    token += chars[randomValues[i] % chars.length];
+  }
+  return token;
 }

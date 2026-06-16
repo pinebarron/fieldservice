@@ -54,7 +54,7 @@ export function PropertiesClient({ properties }: PropertiesClientProps) {
         <div>
           <h2 className="text-2xl font-bold text-foreground">Properties</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Manage your job sites and customer locations
+            Manage your work sites and customer locations
           </p>
         </div>
         <Button className="gap-2" onClick={() => setShowForm(true)}>
@@ -102,7 +102,7 @@ export function PropertiesClient({ properties }: PropertiesClientProps) {
             </div>
             <h3 className="text-lg font-semibold text-foreground mb-2">No properties yet</h3>
             <p className="text-muted-foreground mb-4">
-              This can be re-used and prefill job creations.
+              This can be re-used and prefill work order creations.
             </p>
             <Button onClick={() => setShowForm(true)}>
               <i className="fas fa-plus mr-2"></i>

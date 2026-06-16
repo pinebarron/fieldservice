@@ -159,7 +159,7 @@ export function TechDashboard({
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{todaysJobs.length}</p>
-                <p className="text-xs text-muted-foreground">Today's Jobs</p>
+                <p className="text-xs text-muted-foreground">Today</p>
               </div>
             </div>
           </CardContent>
@@ -210,7 +210,7 @@ export function TechDashboard({
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">{allJobs.length}</p>
-                <p className="text-xs text-muted-foreground">All Jobs</p>
+                <p className="text-xs text-muted-foreground">All Work Orders</p>
               </div>
             </div>
           </CardContent>
@@ -220,12 +220,12 @@ export function TechDashboard({
       {/* Filter Label */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold text-foreground">
-          {viewFilter === 'today' && "Today's Jobs"}
-          {viewFilter === 'upcoming' && 'Upcoming Jobs'}
-          {viewFilter === 'mine' && 'My Assigned Jobs'}
-          {viewFilter === 'all' && 'All Jobs'}
+          {viewFilter === 'today' && "Today's Work Orders"}
+          {viewFilter === 'upcoming' && 'Upcoming Work Orders'}
+          {viewFilter === 'mine' && 'My Assigned Work Orders'}
+          {viewFilter === 'all' && 'All Work Orders'}
         </h3>
-        <span className="text-sm text-muted-foreground">{filteredJobs.length} jobs</span>
+        <span className="text-sm text-muted-foreground">{filteredJobs.length} work orders</span>
       </div>
 
       {/* Job List */}
@@ -235,12 +235,12 @@ export function TechDashboard({
             <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center mx-auto mb-4">
               <i className="fas fa-clipboard-list text-2xl text-muted-foreground"></i>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">No jobs found</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">No work orders found</h3>
             <p className="text-muted-foreground">
-              {viewFilter === 'today' && "You don't have any jobs scheduled for today."}
-              {viewFilter === 'upcoming' && "No upcoming jobs this week."}
-              {viewFilter === 'mine' && "No jobs are currently assigned to you."}
-              {viewFilter === 'all' && "There are no jobs in the system."}
+              {viewFilter === 'today' && "You don't have any work orders scheduled for today."}
+              {viewFilter === 'upcoming' && "No upcoming work orders this week."}
+              {viewFilter === 'mine' && "No work orders are currently assigned to you."}
+              {viewFilter === 'all' && "There are no work orders in the system."}
             </p>
           </CardContent>
         </Card>

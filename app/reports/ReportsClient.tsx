@@ -337,13 +337,13 @@ function OperationsReports({
         <CardContent className="p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <i className="fas fa-tasks text-primary"></i>
-            Job Status Dashboard
+            Work Order Status
           </h3>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div className="bg-muted/50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-foreground">{jobStats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Jobs</p>
+              <p className="text-sm text-muted-foreground">Total Work Orders</p>
             </div>
             <div className="bg-green-50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-green-600">{jobStats.completed}</p>
@@ -407,7 +407,7 @@ function OperationsReports({
                 <thead>
                   <tr className="border-b text-left">
                     <th className="pb-3 font-medium text-sm">Technician</th>
-                    <th className="pb-3 font-medium text-sm text-center">Total Jobs</th>
+                    <th className="pb-3 font-medium text-sm text-center">Total</th>
                     <th className="pb-3 font-medium text-sm text-center">Completed</th>
                     <th className="pb-3 font-medium text-sm text-center">Completion Rate</th>
                     <th className="pb-3 font-medium text-sm text-center">Avg Duration</th>
@@ -453,7 +453,7 @@ function OperationsReports({
           </h3>
 
           {timeByWorkType.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No completed jobs with time tracking data.</p>
+            <p className="text-muted-foreground text-sm">No completed work orders with time tracking data.</p>
           ) : (
             <div className="space-y-3">
               {timeByWorkType.map((item, i) => (
@@ -475,7 +475,7 @@ function OperationsReports({
                     </div>
                   </div>
                   <div className="w-16 text-right text-sm text-muted-foreground">
-                    {item.count} jobs
+                    {item.count} work orders
                   </div>
                 </div>
               ))}
@@ -558,7 +558,7 @@ function QualityReports({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
             <div className="bg-muted/50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-foreground">{formStats.totalCompletedJobs}</p>
-              <p className="text-sm text-muted-foreground">Completed Jobs</p>
+              <p className="text-sm text-muted-foreground">Completed Work Orders</p>
             </div>
             <div className="bg-green-50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-green-600">{formStats.jobsWithForms}</p>
@@ -717,7 +717,7 @@ function SalesReports({
             </div>
             <div className="bg-purple-50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-purple-600">{conversionStats.convertedToJobs}</p>
-              <p className="text-sm text-purple-700">Converted to Jobs</p>
+              <p className="text-sm text-purple-700">Converted to Work Orders</p>
             </div>
           </div>
 
@@ -739,7 +739,7 @@ function SalesReports({
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-24 text-sm text-right text-muted-foreground">Jobs Created</div>
+              <div className="w-24 text-sm text-right text-muted-foreground">Work Orders</div>
               <div
                 className="h-8 bg-purple-100 rounded flex items-center justify-center"
                 style={{ width: `${conversionStats.total > 0 ? Math.max((conversionStats.convertedToJobs / conversionStats.total) * 100, 10) : 10}%` }}
@@ -849,11 +849,11 @@ function GeographicReports({
         <CardContent className="p-6">
           <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
             <i className="fas fa-map-marked-alt text-primary"></i>
-            Job Density by Location
+            Work Order Density by Location
           </h3>
 
           {locationStats.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No job location data available.</p>
+            <p className="text-muted-foreground text-sm">No work order location data available.</p>
           ) : (
             <div className="space-y-2">
               {locationStats.map((loc, i) => {

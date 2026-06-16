@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { FormPhotoField } from '@/components/FormPhotoField';
 import { FormDocumentField } from '@/components/FormDocumentField';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
-import { checkIn, checkOut, updateJobNotes, saveFormSubmission, toggleCustomerConfirmation } from '../../actions';
+import { checkIn, checkOut, updateJobNotes, saveFormSubmission, toggleCustomerConfirmation, sendScorecard } from '../../actions';
 import { useOfflineForm } from '@/lib/offline/useOfflineForm';
 import type { FormPhotoValue, PhotoFieldConfig, FormDocumentValue, DocumentFieldConfig } from '@/lib/form-types';
 
@@ -134,6 +134,16 @@ interface WorkLog {
   check_in_lng?: string | null;
   customer_confirmed?: string | null;
   confirmed_at?: string | null;
+  feedback_token?: string | null;
+  feedback_sent_at?: string | null;
+  feedback_response?: {
+    quality: number;
+    professionalism: number;
+    value: number;
+    timeliness: number;
+    comment?: string;
+  } | null;
+  feedback_submitted_at?: string | null;
 }
 
 interface FormTemplate {
@@ -170,6 +180,8 @@ export function TechJobDetail({
   const [isEditingForm, setIsEditingForm] = useState<string | null>(null); // template ID being edited
   const [formResponses, setFormResponses] = useState<Record<string, unknown>>({});
   const [savedOffline, setSavedOffline] = useState(false);
+  const [scorecardUrl, setScorecardUrl] = useState<string | null>(null);
+  const [scorecardCopied, setScorecardCopied] = useState(false);
 
   // Offline form support
   const { isOnline, saveSubmission, cacheTemplates } = useOfflineForm({ businessId });
@@ -357,6 +369,44 @@ export function TechJobDetail({
     }
 
     setLoading(false);
+  };
+
+  const handleSendScorecard = async () => {
+    setLoading(true);
+    setError('');
+
+    const result = await sendScorecard(job.id);
+
+    if (result.error) {
+      setError(result.error);
+    } else if (result.feedbackUrl) {
+      const fullUrl = `${window.location.origin}${result.feedbackUrl}`;
+      setScorecardUrl(fullUrl);
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        setScorecardCopied(true);
+        setTimeout(() => setScorecardCopied(false), 3000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+      router.refresh();
+    }
+
+    setLoading(false);
+  };
+
+  const copyFeedbackUrl = async () => {
+    const url = scorecardUrl || (job.feedback_token ? `${window.location.origin}/feedback/${job.feedback_token}` : null);
+    if (url) {
+      try {
+        await navigator.clipboard.writeText(url);
+        setScorecardCopied(true);
+        setTimeout(() => setScorecardCopied(false), 3000);
+      } catch (err) {
+        console.error('Failed to copy:', err);
+      }
+    }
   };
 
   const renderFormField = (field: FormField) => {
@@ -571,7 +621,7 @@ export function TechJobDetail({
       {/* Back button */}
       <Link href="/tech" className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground text-sm">
         <i className="fas fa-arrow-left"></i>
-        Back to Jobs
+        Back to Work Orders
       </Link>
 
       {/* Offline indicator */}
@@ -623,7 +673,7 @@ export function TechJobDetail({
           {isAssigned ? (
             <div className="flex items-center gap-2 mb-4 p-2 bg-primary/10 rounded-lg">
               <i className="fas fa-user-check text-primary"></i>
-              <span className="text-sm text-primary font-medium">This job is assigned to you</span>
+              <span className="text-sm text-primary font-medium">This work order is assigned to you</span>
             </div>
           ) : (
             <div className="flex items-center gap-2 mb-4 p-2 bg-yellow-100 rounded-lg">
@@ -667,7 +717,7 @@ export function TechJobDetail({
                     ) : (
                       <i className="fas fa-check-circle"></i>
                     )}
-                    Complete Job
+                    Complete Work Order
                   </Button>
                 </>
               )}
@@ -675,7 +725,7 @@ export function TechJobDetail({
               {job.status === 'completed' && (
                 <div className="flex-1 p-3 bg-green-50 border border-green-200 rounded-lg text-center">
                   <i className="fas fa-check-circle text-green-600 mr-2"></i>
-                  <span className="text-green-700 font-medium">Job Completed</span>
+                  <span className="text-green-700 font-medium">Work Order Completed</span>
                 </div>
               )}
             </div>
@@ -739,6 +789,139 @@ export function TechJobDetail({
           </div>
         </CardContent>
       </Card>
+
+      {/* Customer Scorecard Card */}
+      {job.status === 'completed' && (
+        <Card>
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {job.feedback_submitted_at ? (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                      <i className="fas fa-star text-green-600 text-lg"></i>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-green-700">Feedback Received</p>
+                      <p className="text-xs text-muted-foreground">
+                        Submitted {new Date(job.feedback_submitted_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </>
+                ) : job.feedback_sent_at ? (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                      <i className="fas fa-paper-plane text-blue-600 text-lg"></i>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-blue-700">Scorecard Sent</p>
+                      <p className="text-xs text-muted-foreground">
+                        Sent {new Date(job.feedback_sent_at).toLocaleDateString()} - awaiting response
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                      <i className="fas fa-clipboard-list text-muted-foreground text-lg"></i>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">Customer Scorecard</p>
+                      <p className="text-xs text-muted-foreground">Send feedback request to customer</p>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                {job.feedback_token && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyFeedbackUrl}
+                  >
+                    {scorecardCopied ? (
+                      <>
+                        <i className="fas fa-check mr-1 text-green-600"></i>
+                        Copied!
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-copy mr-1"></i>
+                        Copy Link
+                      </>
+                    )}
+                  </Button>
+                )}
+                {!job.feedback_token && canEdit && (
+                  <Button
+                    size="sm"
+                    onClick={handleSendScorecard}
+                    disabled={loading}
+                  >
+                    {loading ? (
+                      <i className="fas fa-spinner fa-spin"></i>
+                    ) : (
+                      <>
+                        <i className="fas fa-paper-plane mr-1"></i>
+                        Generate Link
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Show feedback results if submitted */}
+            {job.feedback_response && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { key: 'quality', label: 'Quality' },
+                    { key: 'professionalism', label: 'Professionalism' },
+                    { key: 'value', label: 'Value' },
+                    { key: 'timeliness', label: 'Timeliness' },
+                  ].map(({ key, label }) => {
+                    const rating = (job.feedback_response as any)?.[key] || 0;
+                    return (
+                      <div key={key} className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground">{label}</span>
+                        <div className="flex">
+                          {[1, 2, 3, 4, 5].map(star => (
+                            <i
+                              key={star}
+                              className={`fas fa-star text-sm ${
+                                star <= rating ? 'text-yellow-400' : 'text-gray-300'
+                              }`}
+                            ></i>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                {job.feedback_response.comment && (
+                  <div className="mt-3 p-3 bg-muted/50 rounded-lg">
+                    <p className="text-xs text-muted-foreground mb-1">Customer Comment</p>
+                    <p className="text-sm">{job.feedback_response.comment}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Show copied URL */}
+            {scorecardUrl && !job.feedback_submitted_at && (
+              <div className="mt-4 p-3 bg-green-50 rounded-lg border border-green-200">
+                <p className="text-sm text-green-800">
+                  <i className="fas fa-check-circle mr-2"></i>
+                  Link copied to clipboard! Share it with your customer.
+                </p>
+                <p className="text-xs text-green-600 mt-1 font-mono break-all">{scorecardUrl}</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Location Card */}
       <Card>

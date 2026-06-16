@@ -9,7 +9,7 @@ import { signOut } from "@/app/auth/actions";
 import type { User } from "@supabase/supabase-js";
 
 const NAV_ITEMS = [
-  { href: "/tech", label: "My Jobs", icon: "fa-briefcase" },
+  { href: "/tech", label: "My Work Orders", icon: "fa-briefcase" },
   { href: "/tech/profile", label: "Profile", icon: "fa-user" },
 ];
 

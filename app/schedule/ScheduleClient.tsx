@@ -145,7 +145,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
 
   const handleDelete = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!confirm('Are you sure you want to delete this work log?')) return;
+    if (!confirm('Are you sure you want to delete this work order?')) return;
     setUpdating(id);
     await deleteWorkLog(id);
     setSelectedJob(null);
@@ -197,7 +197,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
         <div>
           <h2 className="text-2xl font-bold text-foreground">Schedule</h2>
           <p className="text-muted-foreground text-sm mt-0.5">
-            View and manage jobs
+            View and manage work orders
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -228,7 +228,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
           </div>
           <Button className="gap-2" onClick={() => setShowForm(true)}>
             <i className="fas fa-plus"></i>
-            New Job
+            New Work Order
           </Button>
         </div>
       </div>
@@ -238,7 +238,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
           <Card className="w-full max-w-lg my-8">
             <CardContent className="p-6 max-h-[85vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">Create New Job</h3>
+              <h3 className="text-lg font-semibold mb-4">Create New Work Order</h3>
               <WorkLogForm
                 onClose={() => setShowForm(false)}
                 onSuccess={() => router.refresh()}
@@ -262,7 +262,7 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
                 /* Edit Mode - use full WorkLogForm */
                 <>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold">Edit Job</h3>
+                    <h3 className="text-xl font-semibold">Edit Work Order</h3>
                     <button type="button" onClick={() => { setSelectedJob(null); setIsEditing(false); }} className="text-muted-foreground hover:text-foreground p-2">
                       <i className="fas fa-times text-lg"></i>
                     </button>

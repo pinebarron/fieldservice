@@ -9,7 +9,7 @@ import { signOut } from "@/app/auth/actions";
 import type { User } from "@supabase/supabase-js";
 
 const NAV_ITEMS = [
-  { href: "/schedule", label: "Jobs", icon: "fa-calendar-alt" },
+  { href: "/schedule", label: "Work Orders", icon: "fa-calendar-alt" },
   { href: "/properties", label: "Properties", icon: "fa-building" },
   { href: "/estimates", label: "Estimates", icon: "fa-file-invoice-dollar" },
   { href: "/reports", label: "Reports", icon: "fa-chart-bar" },
@@ -90,11 +90,11 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
 
           {/* Right side */}
           <div className="flex items-center gap-2">
-            {/* New Job button - always visible */}
+            {/* New Work Order button - always visible */}
             <Link href="/schedule?new=true" className="hidden sm:block">
               <Button size="sm" className="gap-2">
                 <i className="fas fa-plus"></i>
-                New Job
+                New Work Order
               </Button>
             </Link>
 
@@ -143,12 +143,12 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
                     </div>
                   </div>
 
-                  {/* New Job button - mobile */}
+                  {/* New Work Order button - mobile */}
                   <div className="px-4 pt-4">
                     <Link href="/schedule?new=true" onClick={() => setOpen(false)}>
                       <Button className="w-full gap-2">
                         <i className="fas fa-plus"></i>
-                        New Job
+                        New Work Order
                       </Button>
                     </Link>
                   </div>
