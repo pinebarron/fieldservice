@@ -232,15 +232,18 @@ function OperationsReports({
   workLogs: WorkLog[];
   teamMembers: TeamMember[];
 }) {
-  // Job Status Summary
+  // Work Order Status Summary
   const jobStats = useMemo(() => {
     const total = workLogs.length;
     const completed = workLogs.filter(j => j.status === 'completed').length;
     const inProgress = workLogs.filter(j => j.status === 'in-progress').length;
+    const finalReview = workLogs.filter(j => j.status === 'final-review').length;
+    const quotePending = workLogs.filter(j => j.status === 'quote-pending').length;
     const scheduled = workLogs.filter(j => j.status === 'scheduled').length;
-    const cancelled = workLogs.filter(j => j.status === 'cancelled').length;
+    const readyForScheduling = workLogs.filter(j => j.status === 'ready-for-scheduling').length;
+    const cannotComplete = workLogs.filter(j => j.status === 'cannot-complete').length;
 
-    return { total, completed, inProgress, scheduled, cancelled };
+    return { total, completed, inProgress, finalReview, quotePending, scheduled, readyForScheduling, cannotComplete };
   }, [workLogs]);
 
   // Technician Productivity
@@ -340,10 +343,10 @@ function OperationsReports({
             Work Order Status
           </h3>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="bg-muted/50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-foreground">{jobStats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Work Orders</p>
+              <p className="text-sm text-muted-foreground">Total</p>
             </div>
             <div className="bg-green-50 rounded-lg p-4 text-center">
               <p className="text-3xl font-bold text-green-600">{jobStats.completed}</p>
@@ -353,13 +356,28 @@ function OperationsReports({
               <p className="text-3xl font-bold text-blue-600">{jobStats.inProgress}</p>
               <p className="text-sm text-blue-700">In Progress</p>
             </div>
-            <div className="bg-yellow-50 rounded-lg p-4 text-center">
-              <p className="text-3xl font-bold text-yellow-600">{jobStats.scheduled}</p>
-              <p className="text-sm text-yellow-700">Scheduled</p>
+            <div className="bg-cyan-50 rounded-lg p-4 text-center">
+              <p className="text-3xl font-bold text-cyan-600">{jobStats.scheduled}</p>
+              <p className="text-sm text-cyan-700">Scheduled</p>
             </div>
-            <div className="bg-red-50 rounded-lg p-4 text-center">
-              <p className="text-3xl font-bold text-red-600">{jobStats.cancelled}</p>
-              <p className="text-sm text-red-700">Cancelled</p>
+          </div>
+
+          <div className="grid grid-cols-4 gap-3">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-gray-600">{jobStats.readyForScheduling}</p>
+              <p className="text-xs text-gray-600">Ready for Scheduling</p>
+            </div>
+            <div className="bg-orange-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-orange-600">{jobStats.quotePending}</p>
+              <p className="text-xs text-orange-600">Quote Pending</p>
+            </div>
+            <div className="bg-purple-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-purple-600">{jobStats.finalReview}</p>
+              <p className="text-xs text-purple-600">Final Review</p>
+            </div>
+            <div className="bg-red-50 rounded-lg p-3 text-center">
+              <p className="text-xl font-bold text-red-600">{jobStats.cannotComplete}</p>
+              <p className="text-xs text-red-600">Cannot Complete</p>
             </div>
           </div>
 
@@ -375,12 +393,24 @@ function OperationsReports({
                   style={{ width: `${(jobStats.inProgress / jobStats.total) * 100}%` }}
                 />
                 <div
-                  className="bg-yellow-500 h-full"
+                  className="bg-purple-500 h-full"
+                  style={{ width: `${(jobStats.finalReview / jobStats.total) * 100}%` }}
+                />
+                <div
+                  className="bg-orange-500 h-full"
+                  style={{ width: `${(jobStats.quotePending / jobStats.total) * 100}%` }}
+                />
+                <div
+                  className="bg-cyan-500 h-full"
                   style={{ width: `${(jobStats.scheduled / jobStats.total) * 100}%` }}
                 />
                 <div
+                  className="bg-gray-400 h-full"
+                  style={{ width: `${(jobStats.readyForScheduling / jobStats.total) * 100}%` }}
+                />
+                <div
                   className="bg-red-500 h-full"
-                  style={{ width: `${(jobStats.cancelled / jobStats.total) * 100}%` }}
+                  style={{ width: `${(jobStats.cannotComplete / jobStats.total) * 100}%` }}
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2 text-center">

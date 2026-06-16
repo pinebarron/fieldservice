@@ -12,6 +12,7 @@ export interface IndustryConfig {
   icon: string;
   color: string; // Primary color theme
   workTypes: string[];
+  statuses?: { value: string; label: string; color: string }[];
   pricingItems: { name: string; unit: string; defaultPrice?: number }[];
   starterTemplates: StarterTemplate[];
 }
@@ -79,6 +80,16 @@ export const INDUSTRIES: Record<IndustryId, IndustryConfig> = {
       'Underperformance/Low Generation',
       'Vegetation/Shading',
       'Warranty Claim/Visit',
+    ],
+    // Work order statuses with colors
+    statuses: [
+      { value: 'ready-for-scheduling', label: 'Ready for Scheduling', color: 'gray' },
+      { value: 'scheduled', label: 'Scheduled', color: 'cyan' },
+      { value: 'quote-pending', label: 'Quote Pending', color: 'orange' },
+      { value: 'final-review', label: 'Final Review', color: 'purple' },
+      { value: 'in-progress', label: 'In Progress', color: 'blue' },
+      { value: 'completed', label: 'Completed', color: 'green' },
+      { value: 'cannot-complete', label: 'Cannot Complete', color: 'red' },
     ],
     pricingItems: [
       // System Components

@@ -62,6 +62,7 @@ interface WorkLog {
   property_id?: string | null;
   technician_user_id?: string | null;
   assigned_tech?: AssignedTech | null;
+  cannot_complete_reason?: string | null;
 }
 
 type FormTemplate = {
@@ -299,12 +300,24 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
                             ? 'bg-green-100 text-green-700'
                             : selectedJob.status === 'in-progress'
                             ? 'bg-blue-100 text-blue-700'
-                            : 'bg-yellow-100 text-yellow-700'
+                            : selectedJob.status === 'final-review'
+                            ? 'bg-purple-100 text-purple-700'
+                            : selectedJob.status === 'quote-pending'
+                            ? 'bg-orange-100 text-orange-700'
+                            : selectedJob.status === 'scheduled'
+                            ? 'bg-cyan-100 text-cyan-700'
+                            : selectedJob.status === 'cannot-complete'
+                            ? 'bg-red-100 text-red-700'
+                            : 'bg-gray-100 text-gray-700'
                         }`}
                       >
+                        <option value="ready-for-scheduling">Ready for Scheduling</option>
                         <option value="scheduled">Scheduled</option>
+                        <option value="quote-pending">Quote Pending</option>
+                        <option value="final-review">Final Review</option>
                         <option value="in-progress">In Progress</option>
                         <option value="completed">Completed</option>
+                        <option value="cannot-complete">Cannot Complete</option>
                       </select>
                       <button onClick={() => setSelectedJob(null)} className="text-muted-foreground hover:text-foreground p-2">
                         <i className="fas fa-times text-lg"></i>
@@ -350,6 +363,17 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
                       Get Directions
                     </a>
                   </div>
+
+                  {/* Cannot Complete Reason */}
+                  {selectedJob.status === 'cannot-complete' && selectedJob.cannot_complete_reason && (
+                    <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+                      <h4 className="font-medium mb-2 text-red-800 flex items-center gap-2">
+                        <i className="fas fa-exclamation-triangle"></i>
+                        Cannot Complete Reason
+                      </h4>
+                      <p className="text-red-700">{selectedJob.cannot_complete_reason}</p>
+                    </div>
+                  )}
 
                   {/* Work Performed */}
                   <div className="mb-6">
@@ -634,12 +658,24 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
                           ? 'bg-green-100 text-green-700'
                           : job.status === 'in-progress'
                           ? 'bg-blue-100 text-blue-700'
-                          : 'bg-yellow-100 text-yellow-700'
+                          : job.status === 'final-review'
+                          ? 'bg-purple-100 text-purple-700'
+                          : job.status === 'quote-pending'
+                          ? 'bg-orange-100 text-orange-700'
+                          : job.status === 'scheduled'
+                          ? 'bg-cyan-100 text-cyan-700'
+                          : job.status === 'cannot-complete'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-gray-100 text-gray-700'
                       }`}
                     >
+                      <option value="ready-for-scheduling">Ready for Scheduling</option>
                       <option value="scheduled">Scheduled</option>
+                      <option value="quote-pending">Quote Pending</option>
+                      <option value="final-review">Final Review</option>
                       <option value="in-progress">In Progress</option>
                       <option value="completed">Completed</option>
+                      <option value="cannot-complete">Cannot Complete</option>
                     </select>
                     <button
                       onClick={(e) => handleDelete(job.id, e)}

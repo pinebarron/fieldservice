@@ -144,6 +144,7 @@ interface WorkLog {
     comment?: string;
   } | null;
   feedback_submitted_at?: string | null;
+  cannot_complete_reason?: string | null;
 }
 
 interface FormTemplate {
@@ -214,6 +215,8 @@ export function TechJobDetail({
         return 'bg-green-100 text-green-700 border-green-200';
       case 'in-progress':
         return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'cannot-complete':
+        return 'bg-red-100 text-red-700 border-red-200';
       case 'scheduled':
       default:
         return 'bg-yellow-100 text-yellow-700 border-yellow-200';
@@ -728,10 +731,34 @@ export function TechJobDetail({
                   <span className="text-green-700 font-medium">Work Order Completed</span>
                 </div>
               )}
+
+              {job.status === 'cannot-complete' && (
+                <div className="flex-1 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+                  <i className="fas fa-times-circle text-red-600 mr-2"></i>
+                  <span className="text-red-700 font-medium">Cannot Complete</span>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Cannot Complete Reason Card */}
+      {job.status === 'cannot-complete' && job.cannot_complete_reason && (
+        <Card className="border-red-200 bg-red-50/50">
+          <CardContent className="p-5">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                <i className="fas fa-exclamation-triangle text-red-600 text-lg"></i>
+              </div>
+              <div>
+                <p className="font-semibold text-red-800 mb-1">Cannot Complete Reason</p>
+                <p className="text-red-700">{job.cannot_complete_reason}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Customer Confirmation Card */}
       <Card>

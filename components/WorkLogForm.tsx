@@ -173,11 +173,12 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
   const [zipCode, setZipCode] = useState(editJob?.zip_code || '');
   const [selectedPropertyId, setSelectedPropertyId] = useState(editJob?.property_id || '');
   const [serviceDate, setServiceDate] = useState(editJob?.service_date || new Date().toISOString().split('T')[0]);
-  const [status, setStatus] = useState(editJob?.status || 'scheduled');
+  const [status, setStatus] = useState(editJob?.status || 'ready-for-scheduling');
   const [workPerformed, setWorkPerformed] = useState(editJob?.work_performed || '');
   const [notes, setNotes] = useState(editJob?.additional_notes || '');
   const [assignedTo, setAssignedTo] = useState(editJob?.technician_user_id || '');
   const [saveAsProperty, setSaveAsProperty] = useState(false);
+  const [cannotCompleteReason, setCannotCompleteReason] = useState((editJob as any)?.cannot_complete_reason || '');
 
   // Initialize form from editJob (only once)
   useEffect(() => {
@@ -674,12 +675,35 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
             onChange={(e) => setStatus(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
+            <option value="ready-for-scheduling">Ready for Scheduling</option>
             <option value="scheduled">Scheduled</option>
+            <option value="quote-pending">Quote Pending</option>
+            <option value="final-review">Final Review</option>
             <option value="in-progress">In Progress</option>
             <option value="completed">Completed</option>
+            <option value="cannot-complete">Cannot Complete</option>
           </select>
         </div>
       </div>
+
+      {/* Cannot Complete Reason - shown when status is cannot-complete */}
+      {status === 'cannot-complete' && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <label className="block text-sm font-medium mb-1 text-red-800">
+            <i className="fas fa-exclamation-triangle mr-2"></i>
+            Reason for Cannot Complete *
+          </label>
+          <textarea
+            name="cannotCompleteReason"
+            rows={3}
+            required
+            value={cannotCompleteReason}
+            onChange={(e) => setCannotCompleteReason(e.target.value)}
+            className="w-full rounded-md border border-red-300 bg-white px-3 py-2 text-sm"
+            placeholder="Explain why this work order could not be completed (e.g., customer not home, equipment not available, access denied, etc.)"
+          />
+        </div>
+      )}
 
       {/* Technician Assignment */}
       {teamMembers.length > 0 && (

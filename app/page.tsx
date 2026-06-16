@@ -24,7 +24,7 @@ export default function HomePage() {
             <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto drop-shadow">
               Professional work log management for solar field service teams
             </p>
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center mb-6">
               <Link
                 href="/login"
                 className="rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:bg-primary/90 shadow-lg"
@@ -36,6 +36,20 @@ export default function HomePage() {
                 className="rounded-md bg-white/90 backdrop-blur px-6 py-3 font-medium text-gray-900 hover:bg-white shadow-lg"
               >
                 Create Account
+              </Link>
+            </div>
+            <div className="flex gap-6 justify-center">
+              <Link
+                href="/features"
+                className="text-white/80 hover:text-white font-medium transition-colors"
+              >
+                Features
+              </Link>
+              <Link
+                href="/plans"
+                className="text-white/80 hover:text-white font-medium transition-colors"
+              >
+                Pricing
               </Link>
             </div>
           </div>

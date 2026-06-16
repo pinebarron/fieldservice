@@ -28,6 +28,7 @@ export async function createWorkLog(formData: FormData) {
   let propertyId = formData.get('propertyId') as string;
   const assignedTo = formData.get('assignedTo') as string;
   const saveAsProperty = formData.get('saveAsProperty') === 'true';
+  const cannotCompleteReason = formData.get('cannotCompleteReason') as string;
 
   // Parse images - includes GPS data captured at shutter time
   let imageUrls: string[] = [];
@@ -108,6 +109,7 @@ export async function createWorkLog(formData: FormData) {
       additional_notes: notes || null,
       image_urls: imageUrls.length > 0 ? imageUrls : null,
       photo_metadata: photoMetadata.length > 0 ? photoMetadata : null,
+      cannot_complete_reason: status === 'cannot-complete' ? cannotCompleteReason : null,
     })
     .select('id')
     .single();
@@ -267,6 +269,7 @@ export async function updateWorkLog(id: string, formData: FormData) {
   const notes = formData.get('notes') as string;
   const imagesJson = formData.get('images') as string;
   const assignedTo = formData.get('assignedTo') as string;
+  const cannotCompleteReason = formData.get('cannotCompleteReason') as string;
 
   // Parse images - includes GPS data captured at shutter time
   let imageUrls: string[] = [];
@@ -300,6 +303,7 @@ export async function updateWorkLog(id: string, formData: FormData) {
     additional_notes: notes || null,
     image_urls: imageUrls.length > 0 ? imageUrls : null,
     photo_metadata: photoMetadata.length > 0 ? photoMetadata : null,
+    cannot_complete_reason: status === 'cannot-complete' ? cannotCompleteReason : null,
   };
 
   // Update assignedTo if provided
