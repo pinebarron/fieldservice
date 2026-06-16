@@ -57,25 +57,32 @@ export const INDUSTRIES: Record<IndustryId, IndustryConfig> = {
     icon: 'fa-solar-panel',
     color: 'green',
     workTypes: [
-      // Installation & Sales
-      'Solar Installation',
-      'Site Survey',
-      'Consultation',
-      // Operations & Maintenance
-      'Solar Maintenance',
-      'Solar Repair',
-      'Inspection',
+      // Reactive / Corrective
+      'Inverter Fault/Replacement',
+      'Panel Replacement',
+      'Underperformance/Low Generation',
+      'Monitoring Outage',
+      'Electrical Wiring Fault',
+      'Roof Leak',
+      'Storm/Physical Damage',
+      // Preventive
+      'Annual Inspection',
+      'Performance Health Check',
       'Panel Cleaning',
-      'Module Washing',
-      'Vegetation Management',
-      'Soiling Analysis',
-      'Inverter Service',
-      'Tracker Service',
-      'Thermal Imaging',
-      'Performance Audit',
-      // Electrical
-      'Electrical Troubleshooting',
-      'Monitoring System',
+      'Vegetation/Shading',
+      'Battery Health Check',
+      // Install
+      'Site Survey',
+      'Solar Installation',
+      'Add-on/Upgrade',
+      'Panel Remove & Reinstall',
+      'System Relocation',
+      // Administrative / Support
+      'Warranty Claim/Visit',
+      'Troubleshooting',
+      'Customer Support',
+      'Meter/Utility Coordination',
+      'Inspection Remediation',
     ],
     pricingItems: [
       // System Components
