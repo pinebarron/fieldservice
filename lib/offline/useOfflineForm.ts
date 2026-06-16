@@ -145,7 +145,11 @@ export function useOfflineForm({ businessId }: UseOfflineFormOptions) {
           responses,
           existingSubmissionId
         );
-        return result;
+        // Normalize result to match expected return type
+        if (result.error) {
+          return { success: false, error: result.error };
+        }
+        return { success: true };
       } catch (error) {
         console.error('Server save failed, saving offline:', error);
         // Fall through to offline save
