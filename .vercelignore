@@ -1,10 +1,9 @@
 # Old folders from previous Vite/Express setup
 server/
 client/
-api/
+/api/
 dist/
 migrations/
-shared/
 
 # Development files
 *.log
