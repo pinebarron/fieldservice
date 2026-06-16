@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { FormPhotoField } from '@/components/FormPhotoField';
 import { FormDocumentField } from '@/components/FormDocumentField';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
-import { checkIn, checkOut, updateJobNotes, saveFormSubmission } from '../../actions';
+import { checkIn, checkOut, updateJobNotes, saveFormSubmission, toggleCustomerConfirmation } from '../../actions';
+import { useOfflineForm } from '@/lib/offline/useOfflineForm';
 import type { FormPhotoValue, PhotoFieldConfig, FormDocumentValue, DocumentFieldConfig } from '@/lib/form-types';
 
 interface PhotoMeta {
@@ -99,6 +100,11 @@ interface AssignedTech {
   email: string | null;
 }
 
+interface Property {
+  id: string;
+  property_type: string;
+}
+
 interface WorkLog {
   id: string;
   customer_name: string;
@@ -119,12 +125,15 @@ interface WorkLog {
   photo_metadata: PhotoMeta[] | null;
   form_submissions?: FormSubmission[];
   property_id?: string | null;
+  property?: Property | Property[] | null;
   technician_user_id?: string | null;
   assigned_tech?: AssignedTech | AssignedTech[] | null;
   check_in_time?: string | null;
   check_out_time?: string | null;
   check_in_lat?: string | null;
   check_in_lng?: string | null;
+  customer_confirmed?: string | null;
+  confirmed_at?: string | null;
 }
 
 interface FormTemplate {
@@ -140,6 +149,7 @@ interface TechJobDetailProps {
   isAssigned: boolean;
   currentUserId: string;
   formTemplates: FormTemplate[];
+  businessId: string;
 }
 
 export function TechJobDetail({
@@ -148,6 +158,7 @@ export function TechJobDetail({
   isAssigned,
   currentUserId,
   formTemplates,
+  businessId,
 }: TechJobDetailProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -158,9 +169,32 @@ export function TechJobDetail({
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [isEditingForm, setIsEditingForm] = useState<string | null>(null); // template ID being edited
   const [formResponses, setFormResponses] = useState<Record<string, unknown>>({});
+  const [savedOffline, setSavedOffline] = useState(false);
+
+  // Offline form support
+  const { isOnline, saveSubmission, cacheTemplates } = useOfflineForm({ businessId });
+
+  // Cache form templates for offline use when online
+  useEffect(() => {
+    if (isOnline && formTemplates.length > 0) {
+      cacheTemplates(formTemplates.map(t => ({
+        id: t.id,
+        business_id: businessId,
+        name: t.name,
+        description: null,
+        work_type: t.work_type,
+        schema: t.schema,
+        logic_rules: null,
+        is_active: 'true',
+        created_at: null,
+      })));
+    }
+  }, [isOnline, formTemplates, businessId, cacheTemplates]);
 
   // Handle Supabase returning array or single object
   const assignedTech = Array.isArray(job.assigned_tech) ? job.assigned_tech[0] : job.assigned_tech;
+  const property = Array.isArray(job.property) ? job.property[0] : job.property;
+  const propertyType = property?.property_type || 'residential';
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -271,13 +305,15 @@ export function TechJobDetail({
 
     setLoading(true);
     setError('');
+    setSavedOffline(false);
 
     // Find existing submission for this template
     const existingSubmission = job.form_submissions?.find(
       s => s.template_id === formTemplateId
     );
 
-    const result = await saveFormSubmission(
+    // Use offline-aware submission
+    const result = await saveSubmission(
       job.id,
       formTemplateId,
       formResponses,
@@ -289,7 +325,13 @@ export function TechJobDetail({
     } else {
       setIsEditingForm(null);
       setFormResponses({});
-      router.refresh();
+
+      // Check if saved offline
+      if (result.offlineId) {
+        setSavedOffline(true);
+      } else {
+        router.refresh();
+      }
     }
 
     setLoading(false);
@@ -300,6 +342,21 @@ export function TechJobDetail({
       ...prev,
       [fieldId]: value,
     }));
+  };
+
+  const handleToggleConfirmation = async () => {
+    setLoading(true);
+    setError('');
+
+    const result = await toggleCustomerConfirmation(job.id);
+
+    if (result.error) {
+      setError(result.error);
+    } else {
+      router.refresh();
+    }
+
+    setLoading(false);
   };
 
   const renderFormField = (field: FormField) => {
@@ -517,6 +574,22 @@ export function TechJobDetail({
         Back to Jobs
       </Link>
 
+      {/* Offline indicator */}
+      {!isOnline && (
+        <div className="p-3 rounded-md bg-yellow-100 border border-yellow-300 text-yellow-800 text-sm flex items-center gap-2">
+          <i className="fas fa-wifi-slash"></i>
+          <span>You're offline. Changes will sync when you're back online.</span>
+        </div>
+      )}
+
+      {/* Saved offline notification */}
+      {savedOffline && (
+        <div className="p-3 rounded-md bg-blue-100 border border-blue-300 text-blue-800 text-sm flex items-center gap-2">
+          <i className="fas fa-cloud-upload-alt"></i>
+          <span>Form saved offline. It will sync automatically when you're back online.</span>
+        </div>
+      )}
+
       {/* Error display */}
       {error && (
         <div className="p-3 rounded-md bg-destructive/10 text-destructive text-sm">
@@ -529,7 +602,16 @@ export function TechJobDetail({
         <CardContent className="p-5">
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-xl font-bold text-foreground">{job.customer_name}</h1>
+              <div className="flex items-center gap-2 mb-1">
+                <h1 className="text-xl font-bold text-foreground">{job.customer_name}</h1>
+                <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                  propertyType === 'commercial'
+                    ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                    : 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                }`}>
+                  {propertyType === 'commercial' ? 'Commercial' : 'Residential'}
+                </span>
+              </div>
               <p className="text-muted-foreground">{job.work_type}</p>
             </div>
             <span className={`text-sm px-3 py-1 rounded-full font-medium border ${getStatusColor(job.status)}`}>
@@ -598,6 +680,63 @@ export function TechJobDetail({
               )}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Customer Confirmation Card */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {job.customer_confirmed === 'true' ? (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <i className="fas fa-check-circle text-green-600 text-lg"></i>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-green-700">Customer Confirmed</p>
+                    {job.confirmed_at && (
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(job.confirmed_at).toLocaleDateString()} at {new Date(job.confirmed_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <i className="fas fa-clock text-amber-600 text-lg"></i>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-amber-700">Awaiting Confirmation</p>
+                    <p className="text-xs text-muted-foreground">Customer has not confirmed this appointment</p>
+                  </div>
+                </>
+              )}
+            </div>
+            {canEdit && (
+              <Button
+                variant={job.customer_confirmed === 'true' ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleToggleConfirmation}
+                disabled={loading}
+              >
+                {loading ? (
+                  <i className="fas fa-spinner fa-spin"></i>
+                ) : job.customer_confirmed === 'true' ? (
+                  <>
+                    <i className="fas fa-times mr-1"></i>
+                    Unconfirm
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-check mr-1"></i>
+                    Mark Confirmed
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
         </CardContent>
       </Card>
 

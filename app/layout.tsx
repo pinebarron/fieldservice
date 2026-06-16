@@ -4,6 +4,7 @@ import { OfflineIndicator } from '@/components/OfflineIndicator';
 import { UpdatePrompt } from '@/components/UpdatePrompt';
 import { OfflineProvider } from '@/components/OfflineProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { OfflineDebugToggle } from '@/components/OfflineDebugToggle';
 
 export const metadata: Metadata = {
   title: 'Crewatt',
@@ -49,6 +50,7 @@ export default function RootLayout({
           <OfflineProvider>
             <OfflineIndicator />
             <UpdatePrompt />
+            <OfflineDebugToggle />
             {children}
           </OfflineProvider>
         </ErrorBoundary>

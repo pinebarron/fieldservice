@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { createFormTemplate, updateFormTemplate, deleteFormTemplate, cloneFormTemplate, createStarterTemplate, type FormField, type FormFieldType, type FormSection, type ShowIfCondition } from './actions';
+import { cacheFormTemplates } from '@/lib/offline/formOffline';
 import type { PhotoFieldConfig, DocumentFieldConfig } from '@/lib/form-types';
 
 interface FormTemplate {
@@ -18,6 +19,7 @@ interface FormTemplate {
 
 interface FormsClientProps {
   formTemplates: FormTemplate[] | null;
+  businessId: string;
 }
 
 const FIELD_TYPES: { type: FormFieldType; label: string; icon: string }[] = [
@@ -70,7 +72,7 @@ const STARTER_TEMPLATES = [
   },
 ];
 
-export function FormsClient({ formTemplates }: FormsClientProps) {
+export function FormsClient({ formTemplates, businessId }: FormsClientProps) {
   const [showPicker, setShowPicker] = useState(false);
   const [showBuilder, setShowBuilder] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<FormTemplate | null>(null);
@@ -87,6 +89,25 @@ export function FormsClient({ formTemplates }: FormsClientProps) {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editingSection, setEditingSection] = useState<string | null>(null);
   const router = useRouter();
+
+  // Cache form templates for offline use
+  useEffect(() => {
+    if (formTemplates && formTemplates.length > 0 && typeof window !== 'undefined' && navigator.onLine) {
+      cacheFormTemplates(formTemplates.map(t => ({
+        id: t.id,
+        business_id: businessId,
+        name: t.name,
+        description: t.description,
+        work_type: t.work_type,
+        schema: t.schema,
+        logic_rules: null,
+        is_active: t.is_active,
+        created_at: null,
+      }))).catch(err => {
+        console.error('Failed to cache form templates:', err);
+      });
+    }
+  }, [formTemplates, businessId]);
 
   const addSection = () => {
     const newSection: FormSection = {

@@ -190,6 +190,7 @@ export const properties = pgTable("properties", {
   businessId: varchar("business_id").notNull().references(() => businesses.id),
   propertyName: text("property_name").notNull(),
   customerName: text("customer_name").notNull(),
+  propertyType: text("property_type").notNull().default("residential"), // residential, commercial
   locationName: text("location_name").notNull(),
   city: text("city").notNull(),
   state: text("state").notNull(),
@@ -327,6 +328,9 @@ export const workLogs = pgTable("work_logs", {
   // Google Calendar integration
   googleCalendarEventId: text("google_calendar_event_id"),
   googleCalendarSyncedAt: text("google_calendar_synced_at"),
+  // Customer confirmation
+  customerConfirmed: text("customer_confirmed").notNull().default("false"),
+  confirmedAt: timestamp("confirmed_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });

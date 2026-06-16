@@ -8,6 +8,7 @@ interface Property {
   id: string;
   property_name: string;
   customer_name: string;
+  property_type: string;
   location_name: string;
   city: string;
   state: string;
@@ -36,6 +37,7 @@ export function PropertyForm({ onClose, onSuccess, editProperty }: PropertyFormP
   const [zipCode, setZipCode] = useState(editProperty?.zip_code || '');
   const [notes, setNotes] = useState(editProperty?.notes || '');
   const [status, setStatus] = useState(editProperty?.status || 'active');
+  const [propertyType, setPropertyType] = useState(editProperty?.property_type || 'residential');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -51,6 +53,7 @@ export function PropertyForm({ onClose, onSuccess, editProperty }: PropertyFormP
     formData.set('zipCode', zipCode);
     formData.set('notes', notes);
     formData.set('status', status);
+    formData.set('propertyType', propertyType);
 
     let result;
     if (isEditMode && editProperty) {
@@ -97,6 +100,44 @@ export function PropertyForm({ onClose, onSuccess, editProperty }: PropertyFormP
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           placeholder="John Smith"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-1">Property Type *</label>
+        <div className="flex gap-3">
+          <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md border cursor-pointer transition-colors ${
+            propertyType === 'residential'
+              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+              : 'border-input bg-background hover:bg-muted'
+          }`}>
+            <input
+              type="radio"
+              name="propertyType"
+              value="residential"
+              checked={propertyType === 'residential'}
+              onChange={(e) => setPropertyType(e.target.value)}
+              className="sr-only"
+            />
+            <i className="fas fa-home"></i>
+            <span className="font-medium">Residential</span>
+          </label>
+          <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-md border cursor-pointer transition-colors ${
+            propertyType === 'commercial'
+              ? 'border-purple-500 bg-purple-50 text-purple-700'
+              : 'border-input bg-background hover:bg-muted'
+          }`}>
+            <input
+              type="radio"
+              name="propertyType"
+              value="commercial"
+              checked={propertyType === 'commercial'}
+              onChange={(e) => setPropertyType(e.target.value)}
+              className="sr-only"
+            />
+            <i className="fas fa-building"></i>
+            <span className="font-medium">Commercial</span>
+          </label>
+        </div>
       </div>
 
       <div>

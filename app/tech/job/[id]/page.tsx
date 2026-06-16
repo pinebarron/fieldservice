@@ -17,7 +17,7 @@ export default async function TechJobPage({ params }: PageProps) {
 
   const adminClient = createAdminClient();
 
-  // Fetch the job with related data
+  // Fetch the job with related data including property
   const { data: job } = await adminClient
     .from('work_logs')
     .select(`
@@ -38,6 +38,10 @@ export default async function TechJobPage({ params }: PageProps) {
         first_name,
         last_name,
         email
+      ),
+      property:properties(
+        id,
+        property_type
       )
     `)
     .eq('id', id)
@@ -70,6 +74,7 @@ export default async function TechJobPage({ params }: PageProps) {
           isAssigned={isAssigned}
           currentUserId={userId || ''}
           formTemplates={formTemplates || []}
+          businessId={business.id}
         />
       </main>
     </div>

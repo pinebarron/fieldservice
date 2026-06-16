@@ -21,7 +21,7 @@ export default async function FormsPage() {
     <div className="min-h-screen bg-background">
       <AppHeader user={user} userProfile={userProfile || undefined} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <FormsClient formTemplates={formTemplates} />
+        <FormsClient formTemplates={formTemplates} businessId={business.id} />
       </main>
     </div>
   );

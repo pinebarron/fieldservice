@@ -54,13 +54,37 @@ export interface OfflineFormTemplate {
   id: string;
   businessId: string;
   name: string;
+  description: string | null;
   workType: string;
   schema: unknown;
+  logicRules: unknown | null;
   isActive: string;
   createdAt: string | null;
   // Offline tracking
   _syncStatus: 'synced' | 'pending' | 'error';
   _lastModified: number;
+}
+
+export interface OfflineFormSubmission {
+  id: string;
+  workLogId: string;
+  formTemplateId: string;
+  responses: Record<string, unknown>;
+  submittedAt: string;
+  createdAt: string | null;
+  updatedAt: string | null;
+  // Offline tracking
+  _localId?: string;
+  _syncStatus: 'synced' | 'pending' | 'error';
+  _lastModified: number;
+  // Store photo blobs separately for offline
+  _pendingPhotos?: Array<{
+    fieldId: string;
+    blob: Blob;
+    filename: string;
+    gps?: { lat: number; lng: number; accuracy?: number };
+    capturedAt: string;
+  }>;
 }
 
 export interface SyncQueueItem {
@@ -96,6 +120,7 @@ class FieldServiceDB extends Dexie {
   workLogs!: Table<OfflineWorkLog, string>;
   properties!: Table<OfflineProperty, string>;
   formTemplates!: Table<OfflineFormTemplate, string>;
+  formSubmissions!: Table<OfflineFormSubmission, string>;
   syncQueue!: Table<SyncQueueItem, number>;
   photos!: Table<OfflinePhoto, string>;
   cacheMetadata!: Table<CacheMetadata, string>;
@@ -107,6 +132,17 @@ class FieldServiceDB extends Dexie {
       workLogs: 'id, businessId, serviceDate, status, _syncStatus, _lastModified',
       properties: 'id, businessId, customerName, _syncStatus, _lastModified',
       formTemplates: 'id, businessId, workType, _syncStatus',
+      syncQueue: '++id, table, recordId, createdAt, attempts',
+      photos: 'id, workLogId, uploaded',
+      cacheMetadata: 'key, table, businessId, expiresAt',
+    });
+
+    // Version 2: Add form submissions table
+    this.version(2).stores({
+      workLogs: 'id, businessId, serviceDate, status, _syncStatus, _lastModified',
+      properties: 'id, businessId, customerName, _syncStatus, _lastModified',
+      formTemplates: 'id, businessId, workType, _syncStatus',
+      formSubmissions: 'id, workLogId, formTemplateId, _syncStatus, _lastModified',
       syncQueue: '++id, table, recordId, createdAt, attempts',
       photos: 'id, workLogId, uploaded',
       cacheMetadata: 'key, table, businessId, expiresAt',

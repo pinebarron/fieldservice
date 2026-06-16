@@ -1,6 +1,7 @@
 'use client';
 
-import { db, type SyncQueueItem, isLocalId } from './db';
+import { db, type SyncQueueItem, type OfflineFormSubmission, isLocalId } from './db';
+import { markFormSubmissionSynced, markFormSubmissionError } from './formOffline';
 
 type SyncAction = {
   action: 'create' | 'update' | 'delete';
@@ -197,9 +198,98 @@ class SyncService {
   }
 
   private async syncFormSubmission(action: string, recordId: string, payload: unknown): Promise<void> {
-    // Form submissions are typically created along with work logs
-    // Handle if needed
-    console.log('Syncing form submission', { action, recordId, payload });
+    const data = payload as OfflineFormSubmission;
+
+    if (action === 'create' || action === 'update') {
+      // First, upload any pending photos
+      const uploadedPhotoUrls: Record<string, string[]> = {};
+
+      if (data._pendingPhotos && data._pendingPhotos.length > 0) {
+        for (const photo of data._pendingPhotos) {
+          try {
+            const formData = new FormData();
+            formData.append('file', photo.blob, photo.filename);
+            formData.append('workLogId', data.workLogId);
+            if (photo.gps) {
+              formData.append('lat', String(photo.gps.lat));
+              formData.append('lng', String(photo.gps.lng));
+              if (photo.gps.accuracy) {
+                formData.append('accuracy', String(photo.gps.accuracy));
+              }
+            }
+            formData.append('capturedAt', photo.capturedAt);
+
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (response.ok) {
+              const result = await response.json();
+              if (!uploadedPhotoUrls[photo.fieldId]) {
+                uploadedPhotoUrls[photo.fieldId] = [];
+              }
+              uploadedPhotoUrls[photo.fieldId].push(result.url);
+            }
+          } catch (error) {
+            console.error('Failed to upload photo:', error);
+          }
+        }
+      }
+
+      // Update responses with uploaded photo URLs
+      const updatedResponses = { ...data.responses };
+      for (const [fieldId, urls] of Object.entries(uploadedPhotoUrls)) {
+        const existingPhotos = (updatedResponses[fieldId] as Array<Record<string, unknown>>) || [];
+        updatedResponses[fieldId] = existingPhotos.map((photo, index) => ({
+          ...photo,
+          url: urls[index] || photo.url,
+          _pendingUpload: undefined,
+        }));
+      }
+
+      // Now sync the form submission to the server
+      const response = await fetch('/api/offline/sync/form-submissions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          workLogId: data.workLogId,
+          formTemplateId: data.formTemplateId,
+          responses: updatedResponses,
+          submittedAt: data.submittedAt,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        await markFormSubmissionError(recordId, error.message || 'Sync failed');
+        throw new Error(error.message || 'Failed to sync form submission');
+      }
+
+      const result = await response.json();
+
+      // Update local record with server ID
+      if (isLocalId(recordId) && result.id) {
+        await markFormSubmissionSynced(recordId, result.id);
+      } else {
+        await db.formSubmissions.update(recordId, {
+          _syncStatus: 'synced',
+          _pendingPhotos: undefined,
+        });
+      }
+    } else if (action === 'delete') {
+      const response = await fetch(`/api/offline/sync/form-submissions/${recordId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete form submission');
+      }
+
+      await db.formSubmissions.delete(recordId);
+    }
   }
 
   // Subscribe to sync status changes

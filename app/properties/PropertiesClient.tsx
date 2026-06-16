@@ -11,6 +11,7 @@ interface Property {
   id: string;
   property_name: string;
   customer_name: string;
+  property_type: string;
   location_name: string;
   city: string;
   state: string;
@@ -123,7 +124,16 @@ export function PropertiesClient({ properties }: PropertiesClientProps) {
                     <i className="fas fa-building text-primary"></i>
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-foreground truncate">{property.property_name}</h3>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-semibold text-foreground truncate">{property.property_name}</h3>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
+                        property.property_type === 'commercial'
+                          ? 'bg-purple-100 text-purple-700'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {property.property_type === 'commercial' ? 'Comm' : 'Res'}
+                      </span>
+                    </div>
                     <p className="text-sm text-muted-foreground">{property.customer_name}</p>
                     <p className="text-xs text-muted-foreground mt-1">
                       {property.location_name}

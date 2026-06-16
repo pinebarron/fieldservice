@@ -13,6 +13,7 @@ export async function createProperty(formData: FormData) {
 
   const propertyName = formData.get('propertyName') as string;
   const customerName = formData.get('customerName') as string;
+  const propertyType = formData.get('propertyType') as string || 'residential';
   const locationName = formData.get('locationName') as string;
   const city = formData.get('city') as string;
   const state = formData.get('state') as string;
@@ -31,6 +32,7 @@ export async function createProperty(formData: FormData) {
       business_id: business.id,
       property_name: propertyName,
       customer_name: customerName,
+      property_type: propertyType,
       location_name: locationName,
       city,
       state,
@@ -57,6 +59,7 @@ export async function updateProperty(id: string, formData: FormData) {
 
   const propertyName = formData.get('propertyName') as string;
   const customerName = formData.get('customerName') as string;
+  const propertyType = formData.get('propertyType') as string || 'residential';
   const locationName = formData.get('locationName') as string;
   const city = formData.get('city') as string;
   const state = formData.get('state') as string;
@@ -75,6 +78,7 @@ export async function updateProperty(id: string, formData: FormData) {
     .update({
       property_name: propertyName,
       customer_name: customerName,
+      property_type: propertyType,
       location_name: locationName,
       city,
       state,

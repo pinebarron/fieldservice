@@ -291,3 +291,56 @@ export async function saveFormSubmission(
   revalidatePath('/schedule');
   return { success: true };
 }
+
+export async function toggleCustomerConfirmation(jobId: string) {
+  const { user, business, userId, role } = await getUserAndBusiness();
+
+  if (!user || !business || !userId) {
+    return { error: 'Not authenticated' };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Verify the job exists and belongs to this business
+  const { data: job } = await adminClient
+    .from('work_logs')
+    .select('*')
+    .eq('id', jobId)
+    .eq('business_id', business.id)
+    .single();
+
+  if (!job) {
+    return { error: 'Job not found' };
+  }
+
+  // Check if tech is assigned to this job (or if they're owner/admin)
+  const isOwnerOrAdmin = role === 'owner' || role === 'admin';
+  const isAssigned = job.technician_user_id === userId;
+
+  if (!isOwnerOrAdmin && !isAssigned) {
+    return { error: 'You are not authorized to update this job' };
+  }
+
+  const isCurrentlyConfirmed = job.customer_confirmed === 'true';
+  const newConfirmedValue = isCurrentlyConfirmed ? 'false' : 'true';
+  const confirmedAt = isCurrentlyConfirmed ? null : new Date().toISOString();
+
+  const { error } = await adminClient
+    .from('work_logs')
+    .update({
+      customer_confirmed: newConfirmedValue,
+      confirmed_at: confirmedAt,
+    })
+    .eq('id', jobId)
+    .eq('business_id', business.id);
+
+  if (error) {
+    console.error('Toggle confirmation error:', error);
+    return { error: error.message };
+  }
+
+  revalidatePath('/tech');
+  revalidatePath(`/tech/job/${jobId}`);
+  revalidatePath('/schedule');
+  return { success: true, confirmed: newConfirmedValue === 'true' };
+}

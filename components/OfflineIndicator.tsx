@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSyncStatus } from '@/lib/offline/useOfflineData';
+import { getDebugOffline } from '@/lib/offline/debugOffline';
 
 export function OfflineIndicator() {
   const [isOffline, setIsOffline] = useState(false);
@@ -9,27 +10,47 @@ export function OfflineIndicator() {
   const { pendingCount, isSyncing } = useSyncStatus();
 
   useEffect(() => {
-    // Check initial state
-    setIsOffline(!navigator.onLine);
+    // Check initial state (respecting debug mode)
+    const debug = getDebugOffline();
+    setIsOffline(debug !== null ? debug : !navigator.onLine);
 
     const handleOnline = () => {
-      setIsOffline(false);
-      // Show "back online" message briefly
-      setShowBanner(true);
-      setTimeout(() => setShowBanner(false), 3000);
+      if (getDebugOffline() === null) {
+        setIsOffline(false);
+        // Show "back online" message briefly
+        setShowBanner(true);
+        setTimeout(() => setShowBanner(false), 3000);
+      }
     };
 
     const handleOffline = () => {
-      setIsOffline(true);
-      setShowBanner(true);
+      if (getDebugOffline() === null) {
+        setIsOffline(true);
+        setShowBanner(true);
+      }
+    };
+
+    // Listen for debug mode changes
+    const handleDebugChange = (e: CustomEvent<{ offline: boolean | null }>) => {
+      if (e.detail.offline !== null) {
+        setIsOffline(e.detail.offline);
+        setShowBanner(true);
+        if (!e.detail.offline) {
+          setTimeout(() => setShowBanner(false), 3000);
+        }
+      } else {
+        setIsOffline(!navigator.onLine);
+      }
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
+    window.addEventListener('debug-offline-change', handleDebugChange as EventListener);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('debug-offline-change', handleDebugChange as EventListener);
     };
   }, []);
 
