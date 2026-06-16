@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { createFormTemplate, updateFormTemplate, deleteFormTemplate, cloneFormTemplate, createStarterTemplate, type FormField, type FormFieldType, type FormSection, type ShowIfCondition } from './actions';
 import { cacheFormTemplates } from '@/lib/offline/formOffline';
 import type { PhotoFieldConfig, DocumentFieldConfig } from '@/lib/form-types';
+import { getAllEnabledWorkTypes } from '@/lib/industries';
 
 interface FormTemplate {
   id: string;
@@ -37,16 +38,8 @@ const FIELD_TYPES: { type: FormFieldType; label: string; icon: string }[] = [
   { type: 'gps', label: 'GPS Location', icon: 'fa-map-marker-alt' },
 ];
 
-const WORK_TYPES = [
-  'Solar Installation',
-  'Solar Maintenance',
-  'Solar Repair',
-  'Inspection',
-  'Site Survey',
-  'Panel Cleaning',
-  'Inverter Service',
-  'Consultation',
-];
+// Get work types from industry config
+const WORK_TYPES = getAllEnabledWorkTypes();
 
 const STARTER_TEMPLATES = [
   {

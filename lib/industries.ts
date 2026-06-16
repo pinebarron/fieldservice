@@ -57,14 +57,25 @@ export const INDUSTRIES: Record<IndustryId, IndustryConfig> = {
     icon: 'fa-solar-panel',
     color: 'green',
     workTypes: [
+      // Installation & Sales
       'Solar Installation',
+      'Site Survey',
+      'Consultation',
+      // Operations & Maintenance
       'Solar Maintenance',
       'Solar Repair',
       'Inspection',
-      'Site Survey',
       'Panel Cleaning',
+      'Module Washing',
+      'Vegetation Management',
+      'Soiling Analysis',
       'Inverter Service',
-      'Consultation',
+      'Tracker Service',
+      'Thermal Imaging',
+      'Performance Audit',
+      // Electrical
+      'Electrical Troubleshooting',
+      'Monitoring System',
     ],
     pricingItems: [
       // System Components

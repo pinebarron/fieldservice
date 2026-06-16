@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/schedule", label: "Jobs", icon: "fa-calendar-alt" },
   { href: "/properties", label: "Properties", icon: "fa-building" },
   { href: "/estimates", label: "Estimates", icon: "fa-file-invoice-dollar" },
+  { href: "/reports", label: "Reports", icon: "fa-chart-bar" },
   { href: "/team", label: "Team", icon: "fa-users" },
   { href: "/pricing", label: "Pricing", icon: "fa-tag" },
   { href: "/forms", label: "Forms", icon: "fa-file-alt" },

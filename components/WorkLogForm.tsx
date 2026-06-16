@@ -7,6 +7,7 @@ import { FormPhotoField } from '@/components/FormPhotoField';
 import { FormDocumentField } from '@/components/FormDocumentField';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
 import type { FormPhotoValue, PhotoFieldConfig, FormDocumentValue, DocumentFieldConfig } from '@/lib/form-types';
+import { getAllEnabledWorkTypes } from '@/lib/industries';
 
 // Conditional display rule
 type ShowIfCondition = {
@@ -102,17 +103,10 @@ interface WorkLogFormProps {
   defaultState?: string;
 }
 
-const WORK_TYPES = [
-  'Solar Installation',
-  'Solar Maintenance',
-  'Solar Repair',
-  'Inspection',
-  'Maintenance',
-  'Repair',
-  'Installation',
-  'Consultation',
-  'Other',
-];
+// Get work types from industry config, with fallback
+const WORK_TYPES = getAllEnabledWorkTypes().length > 0
+  ? [...getAllEnabledWorkTypes(), 'Other']
+  : ['Solar Installation', 'Solar Maintenance', 'Solar Repair', 'Inspection', 'Other'];
 
 // Evaluate whether a field should be shown based on its showIf condition
 function evaluateShowIf(condition: ShowIfCondition | undefined, formResponses: Record<string, any>): boolean {
