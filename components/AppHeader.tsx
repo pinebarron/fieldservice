@@ -62,7 +62,7 @@ export function AppHeader({ user, userProfile }: AppHeaderProps) {
                 <i className="fas fa-clipboard-list text-primary-foreground text-xl"></i>
               </div>
               <div className="hidden sm:block">
-                <h1 className="text-xl font-bold text-foreground">FieldCapture</h1>
+                <h1 className="text-xl font-bold text-foreground">Crewatt</h1>
                 <p className="text-xs text-muted-foreground">Service Work Logger</p>
               </div>
             </div>

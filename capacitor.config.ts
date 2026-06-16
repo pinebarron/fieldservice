@@ -4,8 +4,8 @@ import type { CapacitorConfig } from '@capacitor/cli';
 const PRODUCTION_URL = process.env.CAPACITOR_SERVER_URL || '';
 
 const config: CapacitorConfig = {
-  appId: 'com.fieldswork.app',
-  appName: 'Fields.work',
+  appId: 'com.crewatt.app',
+  appName: 'Crewatt',
   webDir: 'out',
   server: {
     // Use production URL if set, otherwise use local dev server

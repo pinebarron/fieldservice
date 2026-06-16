@@ -23,7 +23,7 @@ export default function PressureWashingLandingPage() {
               <span className="text-white/90 text-sm font-medium">Built for Pressure Washing Pros</span>
             </div>
             <h1 className="text-4xl md:text-6xl font-bold mb-4 text-white drop-shadow-lg">
-              Field Capture
+              Crewatt
             </h1>
             <p className="text-lg md:text-xl text-white/90 mb-8 max-w-2xl mx-auto drop-shadow">
               Before & after photos, job tracking, and estimates for pressure washing businesses
@@ -51,7 +51,7 @@ export default function PressureWashingLandingPage() {
         <div className="max-w-4xl mx-auto text-center mb-16">
           <h2 className="text-3xl font-bold mb-4">Stop Losing Jobs to Poor Documentation</h2>
           <p className="text-lg text-muted-foreground">
-            Your before & after photos are your best marketing. Field Capture organizes them automatically with GPS verification.
+            Your before & after photos are your best marketing. Crewatt organizes them automatically with GPS verification.
           </p>
         </div>
 

@@ -46,7 +46,7 @@ export function BusinessOnboarding() {
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl mb-2">Welcome to Field Capture!</CardTitle>
+          <CardTitle className="text-3xl mb-2">Welcome to Crewatt!</CardTitle>
           <CardDescription>
             Let's set up your business account
           </CardDescription>

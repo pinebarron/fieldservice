@@ -294,8 +294,8 @@ export function EstimatePDF({ estimate, businessName }: Props) {
         {/* ── Letterhead ── */}
         <View style={s.letterhead}>
           <View style={s.lhLeft}>
-            <Text style={s.lhCompany}>{businessName || "FieldCapture"}</Text>
-            <Text style={s.lhTagline}>Field Service Management · Professional Estimates</Text>
+            <Text style={s.lhCompany}>{businessName || "Crewatt"}</Text>
+            <Text style={s.lhTagline}>Solar Field Service Management · Professional Estimates</Text>
           </View>
           <View style={s.lhRight}>
             <Text style={s.lhFormTitle}>ESTIMATE</Text>
@@ -455,7 +455,7 @@ export function EstimatePDF({ estimate, businessName }: Props) {
 
         {/* ── Footer ── */}
         <View style={s.footer} fixed>
-          <Text style={s.footerBold}>{businessName || "FieldCapture"}</Text>
+          <Text style={s.footerBold}>{businessName || "Crewatt"}</Text>
           <Text style={s.footerText}>{estimateNum(estimate.id)}  ·  {estimate.customerName}  ·  {estimate.title}</Text>
           <Text style={s.pageNum} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>

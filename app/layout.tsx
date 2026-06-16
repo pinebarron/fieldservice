@@ -6,13 +6,13 @@ import { OfflineProvider } from '@/components/OfflineProvider';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
-  title: 'Field Capture',
-  description: 'Professional work log management for field service teams',
+  title: 'Crewatt',
+  description: 'Professional work log management for solar field service teams',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'Field Capture',
+    title: 'Crewatt',
   },
   formatDetection: {
     telephone: true,

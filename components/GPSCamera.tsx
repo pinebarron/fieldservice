@@ -166,7 +166,7 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
               accuracy: accuracy ?? undefined,
             },
             timestamp: captureTime,
-            software: 'FieldService GPS Camera',
+            software: 'Crewatt GPS Camera',
           });
           hasExif = true;
         } catch (exifError) {
@@ -303,7 +303,7 @@ export function GPSCamera({ onCapture, onClose }: GPSCameraProps) {
               accuracy: accuracy ?? undefined,
             },
             timestamp: captureTime,
-            software: 'FieldService GPS Camera',
+            software: 'Crewatt GPS Camera',
           });
           hasExif = true;
         } catch (exifError) {

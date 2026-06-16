@@ -4,7 +4,7 @@
 
 set -e
 
-echo "Building Field Capture for mobile..."
+echo "Building Crewatt for mobile..."
 
 # Create minimal out directory for Capacitor
 rm -rf out
@@ -17,7 +17,7 @@ cat > out/index.html << 'EOF'
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Field Capture</title>
+  <title>Crewatt</title>
   <style>
     body {
       font-family: -apple-system, system-ui, sans-serif;
@@ -45,7 +45,7 @@ cat > out/index.html << 'EOF'
 <body>
   <div class="loading">
     <div class="spinner"></div>
-    <p>Loading Field Capture...</p>
+    <p>Loading Crewatt...</p>
   </div>
 </body>
 </html>

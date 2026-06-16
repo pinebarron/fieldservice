@@ -49,7 +49,7 @@ export default function SignupPage() {
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center px-4">
             <h1 className="text-3xl md:text-5xl font-bold mb-2 text-white drop-shadow-lg">
-              Field Capture
+              Crewatt
             </h1>
             <p className="text-base md:text-lg text-white/90 max-w-xl mx-auto drop-shadow">
               Professional work log management for solar and industrial field service teams
@@ -64,7 +64,7 @@ export default function SignupPage() {
             <div className="text-center mb-6">
               <h2 className="text-2xl font-semibold">Create Account</h2>
               <p className="text-muted-foreground mt-1">
-                Get started with Field Capture
+                Get started with Crewatt
               </p>
             </div>
 

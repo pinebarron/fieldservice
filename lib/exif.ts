@@ -73,7 +73,7 @@ export async function embedExifData(
         if (options.software) {
           exifObj['0th'][piexif.ImageIFD.Software] = options.software;
         } else {
-          exifObj['0th'][piexif.ImageIFD.Software] = 'FieldService GPS Camera';
+          exifObj['0th'][piexif.ImageIFD.Software] = 'Crewatt GPS Camera';
         }
 
         if (options.make) {

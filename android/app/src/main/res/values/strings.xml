@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Field Capture</string>
-    <string name="title_activity_main">Field Capture</string>
-    <string name="package_name">com.fieldcapture.app</string>
-    <string name="custom_url_scheme">com.fieldcapture.app</string>
+    <string name="app_name">Crewatt</string>
+    <string name="title_activity_main">Crewatt</string>
+    <string name="package_name">com.crewatt.app</string>
+    <string name="custom_url_scheme">com.crewatt.app</string>
 </resources>

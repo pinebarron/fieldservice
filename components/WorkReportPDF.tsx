@@ -318,7 +318,7 @@ interface Props {
 }
 
 function WorkReportDocument({ workLog, business }: Props) {
-  const businessName = business?.name || 'FieldService';
+  const businessName = business?.name || 'Crewatt';
   const photos = workLog.photo_metadata || [];
 
   // Group photos by fieldLabel (or fallback to type-based labels for legacy photos)
@@ -663,7 +663,7 @@ function WorkReportDocument({ workLog, business }: Props) {
 
         {/* Footer */}
         <View style={s.footer} fixed>
-          <Text style={s.footerBold}>{businessName || "FieldService"}</Text>
+          <Text style={s.footerBold}>{businessName || "Crewatt"}</Text>
           <Text style={s.footerText}>Work Order {orderNum(workLog.id)} · {fmtDate(workLog.service_date)} · {workLog.customer_name}</Text>
           <Text style={s.pageNum} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>

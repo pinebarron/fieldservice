@@ -1,7 +1,7 @@
 {
-  "name": "Field Capture",
-  "short_name": "FieldCapture",
-  "description": "Professional work log management for field service teams",
+  "name": "Crewatt",
+  "short_name": "Crewatt",
+  "description": "Professional work log management for solar field service teams",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

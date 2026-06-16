@@ -290,8 +290,8 @@ export function WorkReportPDF({ workLog, businessName }: Props) {
         {/* ── Letterhead ── */}
         <View style={s.letterhead}>
           <View style={s.lhLeft}>
-            <Text style={s.lhCompany}>{businessName || "FieldCapture"}</Text>
-            <Text style={s.lhTagline}>Field Service Management · Professional Work Documentation</Text>
+            <Text style={s.lhCompany}>{businessName || "Crewatt"}</Text>
+            <Text style={s.lhTagline}>Solar Field Service Management · Professional Work Documentation</Text>
           </View>
           <View style={s.lhRight}>
             <Text style={s.lhFormTitle}>SERVICE COMPLETION FORM</Text>
@@ -481,7 +481,7 @@ export function WorkReportPDF({ workLog, businessName }: Props) {
 
         {/* ── Footer ── */}
         <View style={s.footer} fixed>
-          <Text style={s.footerBold}>{businessName || "FieldCapture"}</Text>
+          <Text style={s.footerBold}>{businessName || "Crewatt"}</Text>
           <Text style={s.footerText}>Work Order {orderNum(workLog.id)}  ·  {fmtDate(workLog.serviceDate)}  ·  {workLog.customerName}</Text>
           <Text style={s.pageNum} render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>

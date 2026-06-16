@@ -227,7 +227,7 @@ export default function EstimateDetail({ params }: { params: { id: string } }) {
                 <i className="fas fa-clipboard-list text-primary-foreground text-xl"></i>
               </div>
               <div>
-                <h1 className="text-xl font-bold text-foreground">FieldCapture</h1>
+                <h1 className="text-xl font-bold text-foreground">Crewatt</h1>
                 <p className="text-xs text-muted-foreground hidden sm:block">Service Work Logger</p>
               </div>
             </div>
