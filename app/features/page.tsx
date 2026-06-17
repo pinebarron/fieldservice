@@ -150,6 +150,12 @@ export default function FeaturesPage() {
             <img src="/icons/crewatt-logo-primary.svg" alt="Crewatt" className="h-10" />
           </Link>
           <div className="flex items-center gap-3">
+            <Link href="/plans" className="text-muted-foreground hover:text-foreground font-medium text-sm">
+              Pricing
+            </Link>
+            <Link href="/contact" className="text-muted-foreground hover:text-foreground font-medium text-sm">
+              Contact
+            </Link>
             <Link href="/login">
               <Button variant="ghost">Log In</Button>
             </Link>
