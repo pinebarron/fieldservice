@@ -2,13 +2,13 @@
 
 ## Executive Summary
 
-Crewatt is a field service management platform purpose-built for small solar installation teams (2-5 technicians). At $39-49/month flat pricing, we're positioned significantly below the industry average of $50-100/user/month, targeting an underserved segment of the 11,000+ solar installation companies in the USA.
+Crewatt is a field service management platform purpose-built for small solar installation teams (2-5 technicians). At $39-49/month flat pricing, we're positioned significantly below the industry average of $50-100/user/month, targeting an underserved segment of the 12,000+ solar installation companies in North America.
 
 ---
 
 ## 1. Market Overview
 
-### Solar Installation Industry (USA)
+### Solar Installation Industry (North America)
 
 | Metric | Value | Source |
 |--------|-------|--------|
@@ -31,7 +31,7 @@ Sources: [Scoop Solar Pricing Guide](https://www.scoop.solar/blog/field-service-
 
 ### Target Market Size Estimate
 
-- ~11,000 solar installation companies in USA
+- ~12,000 solar installation companies in North America (US + Canada)
 - Estimated 60-70% are small operations (1-10 employees): **~7,000 companies**
 - Target segment (2-5 person teams): **~4,000-5,000 companies**
 - At $39-49/month: **TAM = $1.9-2.4M ARR** (100% penetration)

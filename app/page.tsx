@@ -76,7 +76,7 @@ const FEATURES = [
 const STATS = [
   { value: '38%', label: 'of installers cite scheduling as top challenge' },
   { value: '$50-100', label: 'typical per-user monthly cost for FSM software' },
-  { value: '11,000+', label: 'solar installation companies in the USA' },
+  { value: '12,000+', label: 'solar installation companies in North America' },
 ];
 
 export default function HomePage() {

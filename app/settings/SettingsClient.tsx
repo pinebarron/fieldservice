@@ -292,7 +292,7 @@ export function SettingsClient({ business, userEmail, userProfile }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1 block">State</label>
+                  <label className="text-sm font-medium mb-1 block">State / Province</label>
                   <input
                     value={state}
                     onChange={(e) => setState(e.target.value)}
@@ -300,7 +300,7 @@ export function SettingsClient({ business, userEmail, userProfile }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="text-sm font-medium mb-1 block">ZIP</label>
+                  <label className="text-sm font-medium mb-1 block">ZIP / Postal</label>
                   <input
                     value={zipCode}
                     onChange={(e) => setZipCode(e.target.value)}

@@ -137,14 +137,14 @@ function OnboardingForm() {
                   </div>
                   <div>
                     <label htmlFor="state" className="block text-sm font-medium mb-1">
-                      State
+                      State / Province
                     </label>
                     <input
                       id="state"
                       name="state"
                       type="text"
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      placeholder="CA"
+                      placeholder="CA / ON"
                     />
                   </div>
                 </div>
@@ -152,14 +152,14 @@ function OnboardingForm() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="zipCode" className="block text-sm font-medium mb-1">
-                      ZIP Code
+                      ZIP / Postal Code
                     </label>
                     <input
                       id="zipCode"
                       name="zipCode"
                       type="text"
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                      placeholder="12345"
+                      placeholder="12345 / A1A 1A1"
                     />
                   </div>
                   <div>

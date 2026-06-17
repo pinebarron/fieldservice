@@ -616,25 +616,25 @@ export function WorkLogForm({ onClose, onSuccess, formTemplates = [], properties
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">State *</label>
+          <label className="block text-sm font-medium mb-1">State / Province *</label>
           <input
             name="state"
             required
             value={state}
             onChange={(e) => setState(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            placeholder="CA"
+            placeholder="CA / ON"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">ZIP *</label>
+          <label className="block text-sm font-medium mb-1">ZIP / Postal *</label>
           <input
             name="zipCode"
             required
             value={zipCode}
             onChange={(e) => setZipCode(e.target.value)}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-            placeholder="90001"
+            placeholder="90001 / A1A 1A1"
           />
         </div>
       </div>
