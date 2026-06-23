@@ -131,9 +131,23 @@ export function EstimatesClient({ estimates }: EstimatesClientProps) {
                       >
                         {estimate.status}
                       </span>
-                      <span className="text-xs text-muted-foreground">
-                        <i className="fas fa-chevron-right"></i>
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDelete(estimate.id);
+                          }}
+                          disabled={updating === estimate.id}
+                          className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                          title="Delete estimate"
+                        >
+                          <i className={`fas ${updating === estimate.id ? 'fa-spinner fa-spin' : 'fa-trash'} text-xs`}></i>
+                        </button>
+                        <span className="text-xs text-muted-foreground">
+                          <i className="fas fa-chevron-right"></i>
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </CardContent>

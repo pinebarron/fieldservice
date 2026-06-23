@@ -242,6 +242,10 @@ export function EstimateDetailClient({ estimate, lineItems: initialLineItems, pr
             <i className="fas fa-save mr-2"></i>
             {saving ? 'Saving...' : 'Save'}
           </Button>
+          <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
+            <i className={`fas ${deleting ? 'fa-spinner fa-spin' : 'fa-trash'} mr-2`}></i>
+            {deleting ? 'Deleting...' : 'Delete'}
+          </Button>
         </div>
       </div>
 

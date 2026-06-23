@@ -92,6 +92,9 @@ export default function HomePage() {
             <Link href="/features" className="text-white/80 hover:text-white font-medium text-sm transition-colors">
               Features
             </Link>
+            <Link href="/tour" className="text-white/80 hover:text-white font-medium text-sm transition-colors">
+              Tour
+            </Link>
             <Link href="/plans" className="text-white/80 hover:text-white font-medium text-sm transition-colors">
               Pricing
             </Link>
@@ -229,8 +232,81 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
+      {/* Screenshot Preview Section */}
       <section className="py-16 md:py-24 bg-background">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
+              See it in action
+            </h2>
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+              Desktop for the office. Mobile for the field. Everything syncs automatically.
+            </p>
+          </div>
+
+          {/* Main screenshot showcase */}
+          <div className="relative max-w-4xl mx-auto">
+            {/* Desktop mockup */}
+            <div className="bg-card border rounded-xl shadow-2xl overflow-hidden">
+              <div className="bg-muted/50 px-4 py-2 border-b flex items-center gap-2">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-400"></div>
+                  <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
+                  <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                </div>
+                <div className="flex-1 text-center">
+                  <span className="text-xs text-muted-foreground">app.crewatt.com</span>
+                </div>
+              </div>
+              <div className="aspect-[16/9] bg-gradient-to-br from-muted/50 to-muted/20 flex items-center justify-center relative">
+                <img
+                  src="/screenshots/dashboard-desktop.png"
+                  alt="Crewatt dashboard"
+                  className="w-full h-full object-cover object-top absolute inset-0"
+                />
+                <div className="flex flex-col items-center justify-center text-muted-foreground">
+                  <i className="fas fa-desktop text-6xl mb-4 opacity-20"></i>
+                  <span className="text-sm font-medium">Dashboard Screenshot</span>
+                  <span className="text-xs mt-1 opacity-60">Add: /screenshots/dashboard-desktop.png</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Mobile mockup - overlaid */}
+            <div className="absolute -bottom-6 right-4 sm:right-8 w-28 sm:w-36 bg-card border-4 border-background rounded-3xl shadow-2xl overflow-hidden">
+              <div className="bg-muted/50 py-1.5 flex justify-center">
+                <div className="w-16 h-1 bg-muted rounded-full"></div>
+              </div>
+              <div className="aspect-[9/18] bg-gradient-to-br from-muted/50 to-muted/20 flex items-center justify-center relative">
+                <img
+                  src="/screenshots/tech-mobile.png"
+                  alt="Technician mobile view"
+                  className="w-full h-full object-cover object-top absolute inset-0"
+                />
+                <div className="flex flex-col items-center justify-center text-muted-foreground p-2">
+                  <i className="fas fa-mobile-alt text-2xl opacity-20"></i>
+                  <span className="text-[10px] mt-1 text-center">Mobile</span>
+                </div>
+              </div>
+              <div className="bg-muted/50 py-2 flex justify-center">
+                <div className="w-8 h-8 border-2 border-muted rounded-full"></div>
+              </div>
+            </div>
+          </div>
+
+          <div className="text-center mt-16">
+            <Link href="/tour">
+              <Button size="lg" className="gap-2">
+                <i className="fas fa-play-circle"></i>
+                Take the Full Tour
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="py-16 md:py-24 bg-muted/30">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
@@ -453,6 +529,7 @@ export default function HomePage() {
               <h4 className="font-semibold text-foreground mb-3">Product</h4>
               <ul className="space-y-2 text-sm">
                 <li><Link href="/features" className="text-muted-foreground hover:text-foreground">Features</Link></li>
+                <li><Link href="/tour" className="text-muted-foreground hover:text-foreground">Product Tour</Link></li>
                 <li><Link href="/plans" className="text-muted-foreground hover:text-foreground">Pricing</Link></li>
                 <li><Link href="/signup" className="text-muted-foreground hover:text-foreground">Free Trial</Link></li>
               </ul>
