@@ -132,7 +132,7 @@ interface WorkLog {
   check_out_time?: string | null;
   check_in_lat?: string | null;
   check_in_lng?: string | null;
-  customer_confirmed?: string | null;
+  customer_confirmed?: boolean | null;
   confirmed_at?: string | null;
   feedback_token?: string | null;
   feedback_sent_at?: string | null;
@@ -765,7 +765,7 @@ export function TechJobDetail({
         <CardContent className="p-5">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {job.customer_confirmed === 'true' ? (
+              {job.customer_confirmed === true ? (
                 <>
                   <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
                     <i className="fas fa-check-circle text-green-600 text-lg"></i>
@@ -793,14 +793,14 @@ export function TechJobDetail({
             </div>
             {canEdit && (
               <Button
-                variant={job.customer_confirmed === 'true' ? 'outline' : 'default'}
+                variant={job.customer_confirmed === true ? 'outline' : 'default'}
                 size="sm"
                 onClick={handleToggleConfirmation}
                 disabled={loading}
               >
                 {loading ? (
                   <i className="fas fa-spinner fa-spin"></i>
-                ) : job.customer_confirmed === 'true' ? (
+                ) : job.customer_confirmed === true ? (
                   <>
                     <i className="fas fa-times mr-1"></i>
                     Unconfirm

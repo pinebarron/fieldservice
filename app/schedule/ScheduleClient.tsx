@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { WorkLogForm } from '@/components/WorkLogForm';
-import { updateWorkLogStatus, deleteWorkLog } from './actions';
+import { updateWorkLogStatus, deleteWorkLog, sendScorecard } from './actions';
 import { generateWorkReportPDF, downloadPDF } from '@/components/WorkReportPDF';
 import { JobMap } from '@/components/JobMap';
 import { JobCalendar } from '@/components/JobCalendar';
@@ -63,6 +63,16 @@ interface WorkLog {
   technician_user_id?: string | null;
   assigned_tech?: AssignedTech | null;
   cannot_complete_reason?: string | null;
+  feedback_token?: string | null;
+  feedback_sent_at?: string | null;
+  feedback_submitted_at?: string | null;
+  feedback_response?: {
+    quality: number;
+    professionalism: number;
+    value: number;
+    timeliness: number;
+    comment?: string;
+  } | null;
 }
 
 type FormTemplate = {
@@ -128,6 +138,9 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
   const [lightboxImage, setLightboxImage] = useState<string | null>(null);
   const [generatingPDF, setGeneratingPDF] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
+  const [sendingScorecard, setSendingScorecard] = useState(false);
+  const [scorecardUrl, setScorecardUrl] = useState<string | null>(null);
+  const [scorecardCopied, setScorecardCopied] = useState(false);
 
   const router = useRouter();
 
@@ -139,7 +152,13 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
   const handleStatusChange = async (id: string, status: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     setUpdating(id);
-    await updateWorkLogStatus(id, status);
+    const result = await updateWorkLogStatus(id, status);
+    if (!result.error) {
+      // Update local selectedJob state so UI reflects change immediately
+      if (selectedJob && selectedJob.id === id) {
+        setSelectedJob({ ...selectedJob, status });
+      }
+    }
     router.refresh();
     setUpdating(null);
   };
@@ -174,6 +193,47 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
       alert('Failed to generate PDF');
     } finally {
       setGeneratingPDF(false);
+    }
+  };
+
+  const handleSendScorecard = async () => {
+    if (!selectedJob) return;
+    setSendingScorecard(true);
+    const result = await sendScorecard(selectedJob.id);
+    if (result.error) {
+      alert(result.error);
+    } else if (result.feedbackUrl) {
+      const fullUrl = `${window.location.origin}${result.feedbackUrl}`;
+      setScorecardUrl(fullUrl);
+      // Update local state
+      setSelectedJob({
+        ...selectedJob,
+        feedback_token: result.feedbackUrl.split('/').pop() || null,
+        feedback_sent_at: new Date().toISOString(),
+      });
+      // Copy to clipboard
+      try {
+        await navigator.clipboard.writeText(fullUrl);
+        setScorecardCopied(true);
+        setTimeout(() => setScorecardCopied(false), 3000);
+      } catch (e) {
+        console.error('Failed to copy:', e);
+      }
+    }
+    setSendingScorecard(false);
+    router.refresh();
+  };
+
+  const copyFeedbackUrl = async () => {
+    const url = scorecardUrl || (selectedJob?.feedback_token ? `${window.location.origin}/feedback/${selectedJob.feedback_token}` : null);
+    if (url) {
+      try {
+        await navigator.clipboard.writeText(url);
+        setScorecardCopied(true);
+        setTimeout(() => setScorecardCopied(false), 3000);
+      } catch (e) {
+        console.error('Failed to copy:', e);
+      }
     }
   };
 
@@ -490,6 +550,119 @@ export function ScheduleClient({ scheduledJobs, formTemplates, properties = [], 
                           </div>
                         );
                       })}
+                    </div>
+                  )}
+
+                  {/* Customer Scorecard */}
+                  {selectedJob.status === 'completed' && (
+                    <div className="pt-4 border-t">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          {selectedJob.feedback_submitted_at ? (
+                            <>
+                              <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                                <i className="fas fa-star text-green-600 text-lg"></i>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-green-700">Feedback Received</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Submitted {new Date(selectedJob.feedback_submitted_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </>
+                          ) : selectedJob.feedback_sent_at ? (
+                            <>
+                              <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+                                <i className="fas fa-paper-plane text-blue-600 text-lg"></i>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-blue-700">Scorecard Sent</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Sent {new Date(selectedJob.feedback_sent_at).toLocaleDateString()}
+                                </p>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                                <i className="fas fa-clipboard-list text-muted-foreground text-lg"></i>
+                              </div>
+                              <div>
+                                <p className="font-semibold text-foreground">Customer Scorecard</p>
+                                <p className="text-xs text-muted-foreground">Send feedback request to customer</p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          {(selectedJob.feedback_token || scorecardUrl) && (
+                            <Button variant="outline" size="sm" onClick={copyFeedbackUrl}>
+                              {scorecardCopied ? (
+                                <>
+                                  <i className="fas fa-check mr-1 text-green-600"></i>
+                                  Copied!
+                                </>
+                              ) : (
+                                <>
+                                  <i className="fas fa-copy mr-1"></i>
+                                  Copy Link
+                                </>
+                              )}
+                            </Button>
+                          )}
+                          {!selectedJob.feedback_token && !scorecardUrl && (
+                            <Button size="sm" onClick={handleSendScorecard} disabled={sendingScorecard}>
+                              {sendingScorecard ? (
+                                <i className="fas fa-spinner fa-spin"></i>
+                              ) : (
+                                <>
+                                  <i className="fas fa-paper-plane mr-1"></i>
+                                  Generate Link
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Show feedback results if submitted */}
+                      {selectedJob.feedback_response && (
+                        <div className="mt-4 bg-muted/50 rounded-lg p-4">
+                          <div className="grid grid-cols-2 gap-3 mb-3">
+                            {['quality', 'professionalism', 'value', 'timeliness'].map((key) => {
+                              const rating = (selectedJob.feedback_response as any)?.[key] || 0;
+                              return (
+                                <div key={key} className="text-sm">
+                                  <p className="text-muted-foreground capitalize">{key}</p>
+                                  <div className="flex gap-0.5">
+                                    {[1, 2, 3, 4, 5].map((star) => (
+                                      <i
+                                        key={star}
+                                        className={`fas fa-star text-xs ${star <= rating ? 'text-yellow-400' : 'text-gray-300'}`}
+                                      ></i>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {selectedJob.feedback_response.comment && (
+                            <div className="border-t pt-3">
+                              <p className="text-xs text-muted-foreground mb-1">Comment</p>
+                              <p className="text-sm">{selectedJob.feedback_response.comment}</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Show generated URL */}
+                      {scorecardUrl && !selectedJob.feedback_submitted_at && (
+                        <div className="mt-3 p-3 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-sm text-green-700 font-medium">Scorecard link generated!</p>
+                          <p className="text-xs text-green-600 mt-1 font-mono break-all">{scorecardUrl}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 

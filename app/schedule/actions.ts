@@ -373,3 +373,70 @@ export async function getFormTemplates() {
 
   return data || [];
 }
+
+// Generate a secure random token for feedback links
+function generateFeedbackToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+export async function sendScorecard(jobId: string) {
+  const { user, business } = await getUserAndBusiness();
+
+  if (!user || !business) {
+    return { error: 'Not authenticated' };
+  }
+
+  const adminClient = createAdminClient();
+
+  // Verify the work order exists and belongs to this business
+  const { data: job } = await adminClient
+    .from('work_logs')
+    .select('*')
+    .eq('id', jobId)
+    .eq('business_id', business.id)
+    .single();
+
+  if (!job) {
+    return { error: 'Work order not found' };
+  }
+
+  // Check if already has a token
+  if (job.feedback_token) {
+    return {
+      success: true,
+      feedbackUrl: `/feedback/${job.feedback_token}`,
+      alreadySent: true,
+    };
+  }
+
+  // Generate unique token
+  const token = generateFeedbackToken();
+
+  const { error } = await adminClient
+    .from('work_logs')
+    .update({
+      feedback_token: token,
+      feedback_sent_at: new Date().toISOString(),
+    })
+    .eq('id', jobId)
+    .eq('business_id', business.id);
+
+  if (error) {
+    console.error('Send scorecard error:', error);
+    return { error: error.message };
+  }
+
+  revalidatePath('/schedule');
+  revalidatePath('/dashboard');
+
+  return {
+    success: true,
+    feedbackUrl: `/feedback/${token}`,
+    alreadySent: false,
+  };
+}

@@ -321,8 +321,8 @@ export async function toggleCustomerConfirmation(jobId: string) {
     return { error: 'You are not authorized to update this work order' };
   }
 
-  const isCurrentlyConfirmed = job.customer_confirmed === 'true';
-  const newConfirmedValue = isCurrentlyConfirmed ? 'false' : 'true';
+  const isCurrentlyConfirmed = job.customer_confirmed === true;
+  const newConfirmedValue = !isCurrentlyConfirmed;
   const confirmedAt = isCurrentlyConfirmed ? null : new Date().toISOString();
 
   const { error } = await adminClient
@@ -342,7 +342,7 @@ export async function toggleCustomerConfirmation(jobId: string) {
   revalidatePath('/tech');
   revalidatePath(`/tech/job/${jobId}`);
   revalidatePath('/schedule');
-  return { success: true, confirmed: newConfirmedValue === 'true' };
+  return { success: true, confirmed: newConfirmedValue };
 }
 
 export async function sendScorecard(jobId: string) {
